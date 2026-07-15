@@ -2,8 +2,8 @@
 
 An idiomatic, REST-first Dart SDK for [Qdrant](https://qdrant.tech/).
 
-> **Status:** project charter. The public API has not been implemented or
-> published yet.
+> **Status:** foundation in progress. The Docker-backed compatibility harness
+> is available, but the public API has not been implemented or published yet.
 
 ## Why this exists
 
@@ -36,8 +36,28 @@ backends. Do not put a Qdrant Cloud API key in a mobile or browser app.
 gRPC, cluster administration, snapshots, shard management, and local embedding
 inference are explicitly out of scope for v0.1.
 
+## Compatibility
+
+Development is verified against `qdrant/qdrant:v1.18.2`. The version in
+[`tool/qdrant-version`](tool/qdrant-version) is the source of truth used by the
+integration harness.
+
+## Development
+
+Install Dart and Docker, then run:
+
+```sh
+dart pub get
+dart format --output=none --set-exit-if-changed .
+dart analyze --fatal-infos
+dart test --exclude-tags integration
+./tool/test-integration.sh
+```
+
+The integration script starts the pinned Qdrant image on a random localhost
+port, runs the real-server tests, and removes the container afterward.
+
 ## For contributors and agents
 
 Read [PROJECT.md](PROJECT.md) for the roadmap and [AGENTS.md](AGENTS.md) for
 the delivery rules before adding code.
-

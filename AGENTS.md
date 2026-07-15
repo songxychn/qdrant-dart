@@ -30,3 +30,16 @@ Run formatting, static analysis, unit tests, and the relevant real-server
 integration tests. Record the Qdrant image/version used. A mocked-only test is
 not sufficient for endpoint support.
 
+Run these commands from the repository root:
+
+```sh
+dart pub get
+dart format --output=none --set-exit-if-changed .
+dart analyze --fatal-infos
+dart test --exclude-tags integration
+./tool/test-integration.sh
+```
+
+`tool/qdrant-version` is the single source of truth for the tested Qdrant
+version. Every public endpoint change must include its real-server test, README
+example, and compatibility note in the same change.
