@@ -2,5 +2,5 @@
 .packages
 build/
 coverage/
+.idea/
 pubspec.lock
-

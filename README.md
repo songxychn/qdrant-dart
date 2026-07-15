@@ -2,8 +2,8 @@
 
 An idiomatic, REST-first Dart SDK for [Qdrant](https://qdrant.tech/).
 
-> **Status:** foundation in progress. The Docker-backed compatibility harness
-> is available, but the public API has not been implemented or published yet.
+> **Status:** foundation in progress. Client configuration and typed errors are
+> available; collection and point APIs have not been implemented or published.
 
 ## Why this exists
 
@@ -41,6 +41,34 @@ inference are explicitly out of scope for v0.1.
 Development is verified against `qdrant/qdrant:v1.18.2`. The version in
 [`tool/qdrant-version`](tool/qdrant-version) is the source of truth used by the
 integration harness.
+
+The foundation API supports HTTP/HTTPS client configuration, API-key
+authentication, request timeouts, and typed failure reporting. No collection
+or point endpoint is supported yet.
+
+## Client setup
+
+Use the client only in a trusted Dart service or CLI. Read API keys from the
+server-side environment rather than embedding them in a Flutter or browser
+application.
+
+```dart
+import 'dart:io';
+
+import 'package:qdrant_dart/qdrant_dart.dart';
+
+final client = QdrantClient(
+  baseUrl: Uri.parse('https://your-qdrant.example'),
+  apiKey: Platform.environment['QDRANT_API_KEY'],
+);
+
+// Collection and point operations will be added in later releases.
+client.close();
+```
+
+When an operation fails, catch [QdrantException]. It includes the HTTP status
+when Qdrant responded, its error message when available, and the request method
+and URL. It never includes the API key.
 
 ## Development
 
