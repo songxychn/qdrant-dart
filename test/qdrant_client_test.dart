@@ -99,6 +99,14 @@ void main() {
         client.points.retrieve('movies', [true]),
         throwsArgumentError,
       );
+      await expectLater(
+        client.points.delete('', [1]),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.delete('movies', []),
+        throwsArgumentError,
+      );
     });
   });
 

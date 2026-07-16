@@ -161,17 +161,7 @@ final class PointOperations {
         'points': pointList.map((point) => point._toJson()).toList(),
       },
     );
-    final result = _jsonObject(_result(response), 'result');
-    final operationId = result['operation_id'];
-    if (operationId != null && operationId is! int) {
-      throw FormatException(
-        'Qdrant response has no integer operation ID.',
-      );
-    }
-    return UpdateResult(
-      operationId: operationId as int?,
-      status: UpdateStatus._fromJson(result['status']),
-    );
+    return _updateResult(response);
   }
 
   /// Retrieves existing points matching [ids] from [collectionName].
@@ -184,10 +174,7 @@ final class PointOperations {
     bool withPayload = true,
     bool withVector = false,
   }) async {
-    final idList = ids.map(Point._validatePointId).toList(growable: false);
-    if (idList.isEmpty) {
-      throw ArgumentError.value(ids, 'ids', 'must not be empty.');
-    }
+    final idList = _pointIds(ids);
 
     final response = await _transport.send(
       method: 'POST',
@@ -205,8 +192,29 @@ final class PointOperations {
     return result.map(PointRecord._fromJson).toList(growable: false);
   }
 
+  /// Deletes points matching [ids] from [collectionName].
+  ///
+  /// When [wait] is true, Qdrant waits until the deletion has been applied.
+  Future<UpdateResult> delete(
+    String collectionName,
+    Iterable<Object> ids, {
+    bool wait = true,
+  }) async {
+    final response = await _transport.send(
+      method: 'POST',
+      path: _pointsPath(
+        collectionName,
+        operation: 'delete',
+        queryParameters: {'wait': wait.toString()},
+      ),
+      body: {'points': _pointIds(ids)},
+    );
+    return _updateResult(response);
+  }
+
   Uri _pointsPath(
     String collectionName, {
+    String? operation,
     Map<String, String>? queryParameters,
   }) {
     if (collectionName.isEmpty) {
@@ -217,8 +225,35 @@ final class PointOperations {
       );
     }
     return Uri(
-      pathSegments: ['collections', collectionName, 'points'],
+      pathSegments: [
+        'collections',
+        collectionName,
+        'points',
+        if (operation != null) operation,
+      ],
       queryParameters: queryParameters,
+    );
+  }
+
+  List<Object> _pointIds(Iterable<Object> ids) {
+    final idList = ids.map(Point._validatePointId).toList(growable: false);
+    if (idList.isEmpty) {
+      throw ArgumentError.value(ids, 'ids', 'must not be empty.');
+    }
+    return idList;
+  }
+
+  UpdateResult _updateResult(QdrantResponse response) {
+    final result = _jsonObject(_result(response), 'result');
+    final operationId = result['operation_id'];
+    if (operationId != null && operationId is! int) {
+      throw FormatException(
+        'Qdrant response has no integer operation ID.',
+      );
+    }
+    return UpdateResult(
+      operationId: operationId as int?,
+      status: UpdateStatus._fromJson(result['status']),
     );
   }
 

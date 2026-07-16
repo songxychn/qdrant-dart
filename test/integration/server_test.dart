@@ -75,7 +75,7 @@ void main() {
     );
   }, tags: 'integration');
 
-  test('point upsert and retrieval work against the pinned image', () async {
+  test('core point writes work against the pinned image', () async {
     const collectionName = 'qdrant_dart_upsert';
     const uuid = '5c56c793-69f3-4fbf-87e6-c4bf54c28c26';
     final client = QdrantClient(baseUrl: baseUrl);
@@ -142,6 +142,15 @@ void main() {
         .single;
     expect(idOnly.payload, isNull);
     expect(idOnly.vector, isNull);
+
+    final deletion = await client.points.delete(collectionName, [1]);
+    expect(deletion.operationId, isNotNull);
+    expect(deletion.status, UpdateStatus.completed);
+    expect(await client.points.retrieve(collectionName, [1]), isEmpty);
+    expect(
+      (await client.points.retrieve(collectionName, [uuid])).single.id,
+      uuid,
+    );
 
     expect(await client.collections.delete(collectionName), isTrue);
   }, tags: 'integration');
