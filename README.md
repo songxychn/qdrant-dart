@@ -2,8 +2,9 @@
 
 An idiomatic, REST-first Dart SDK for [Qdrant](https://qdrant.tech/).
 
-> **Status:** collection lifecycle is available for default dense vectors;
-> point APIs have not been implemented or published.
+> **Status:** collection lifecycle and point upsert are available for default
+> dense vectors; point reads, deletes, scrolling, and queries are not yet
+> implemented or published.
 
 ## Why this exists
 
@@ -44,9 +45,9 @@ integration harness.
 
 The SDK supports HTTP/HTTPS client configuration, API-key authentication,
 request timeouts, typed failure reporting, and collection lifecycle operations
-against `qdrant/qdrant:v1.18.2`. Collection creation currently supports one
-default dense vector; named/sparse vectors and collection tuning are not yet
-supported.
+plus point upsert against `qdrant/qdrant:v1.18.2`. Collection creation and point
+upsert currently support one default dense vector; named/sparse vectors and
+collection tuning are not yet supported.
 
 ## Client setup
 
@@ -69,6 +70,14 @@ try {
     'movies',
     vectors: VectorParams(size: 4, distance: Distance.cosine),
   );
+  final update = await client.points.upsert('movies', [
+    Point(
+      id: 1,
+      vector: [0.9, 0.1, 0.1, 0.2],
+      payload: {'title': 'The Matrix', 'year': 1999},
+    ),
+  ]);
+  print(update.status);
   final movies = await client.collections.get('movies');
   print(movies.pointsCount);
   await client.collections.delete('movies');

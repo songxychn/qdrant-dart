@@ -4,6 +4,7 @@ import 'qdrant_transport.dart';
 import 'dart:convert';
 
 part 'qdrant_collections.dart';
+part 'qdrant_points.dart';
 
 /// Configures a connection to a Qdrant server.
 ///
@@ -24,6 +25,7 @@ final class QdrantClient {
       timeout: this.timeout,
     );
     collections = CollectionOperations._(_transport);
+    points = PointOperations._(_transport);
   }
 
   /// The default maximum duration for one HTTP request.
@@ -39,6 +41,9 @@ final class QdrantClient {
 
   /// Collection lifecycle operations supported by this SDK.
   late final CollectionOperations collections;
+
+  /// Point operations supported by this SDK.
+  late final PointOperations points;
 
   /// Releases HTTP resources held by this client.
   void close({bool force = false}) => _transport.close(force: force);

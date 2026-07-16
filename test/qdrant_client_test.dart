@@ -41,6 +41,55 @@ void main() {
     });
   });
 
+  group('Point', () {
+    test('accepts supported IDs and copies vector and payload inputs', () {
+      final vector = <num>[0.1, 0.2];
+      final payload = <String, Object?>{'kind': 'example'};
+      final point = Point(id: 1, vector: vector, payload: payload);
+      final uuidPoint = Point(
+        id: '5c56c793-69f3-4fbf-87e6-c4bf54c28c26',
+        vector: [0.2, 0.1],
+      );
+
+      vector[0] = 9;
+      payload['kind'] = 'changed';
+
+      expect(point.id, 1);
+      expect(point.vector, [0.1, 0.2]);
+      expect(point.payload, {'kind': 'example'});
+      expect(uuidPoint.id, '5c56c793-69f3-4fbf-87e6-c4bf54c28c26');
+    });
+
+    test('rejects unsupported IDs and invalid vectors', () {
+      expect(() => Point(id: -1, vector: [0.1]), throwsArgumentError);
+      expect(() => Point(id: true, vector: [0.1]), throwsArgumentError);
+      expect(() => Point(id: 1, vector: []), throwsArgumentError);
+      expect(
+        () => Point(id: 1, vector: [double.infinity]),
+        throwsArgumentError,
+      );
+    });
+  });
+
+  group('PointOperations', () {
+    test('rejects an empty collection name or point list', () async {
+      final client = QdrantClient(
+        baseUrl: Uri.parse('http://127.0.0.1:6333'),
+      );
+      addTearDown(client.close);
+      final point = Point(id: 1, vector: [0.1]);
+
+      await expectLater(
+        client.points.upsert('', [point]),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.upsert('movies', []),
+        throwsArgumentError,
+      );
+    });
+  });
+
   group('QdrantTransport', () {
     test('sends JSON and API-key authentication to the configured base path',
         () async {

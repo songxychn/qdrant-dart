@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:qdrant_dart/qdrant_dart.dart';
 import 'package:test/test.dart';
@@ -73,4 +74,80 @@ void main() {
       isNot(contains('qdrant_dart_lifecycle')),
     );
   }, tags: 'integration');
+
+  test('point upsert works against the pinned Qdrant image', () async {
+    const collectionName = 'qdrant_dart_upsert';
+    const uuid = '5c56c793-69f3-4fbf-87e6-c4bf54c28c26';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: VectorParams(size: 4, distance: Distance.cosine),
+      ),
+      isTrue,
+    );
+
+    const vector = [0.9, 0.1, 0.1, 0.2];
+    final update = await client.points.upsert(collectionName, [
+      Point(
+        id: 1,
+        vector: vector,
+        payload: {'title': 'The Matrix', 'year': 1999},
+      ),
+      Point(
+        id: uuid,
+        vector: [0.1, 0.9, 0.2, 0.1],
+      ),
+    ]);
+
+    expect(update.operationId, isNotNull);
+    expect(update.status, UpdateStatus.completed);
+    final replacement = await client.points.upsert(collectionName, [
+      Point(
+        id: 1,
+        vector: vector,
+        payload: {'title': 'The Matrix Reloaded', 'year': 2003},
+      ),
+    ]);
+    expect(replacement.status, UpdateStatus.completed);
+
+    final stored = await _getPoint(baseUrl, collectionName, 1);
+    expect(stored['id'], 1);
+    final norm = math.sqrt(vector.fold(0, (sum, value) => sum + value * value));
+    expect(
+      stored['vector'],
+      vector.map((value) => closeTo(value / norm, 0.000001)).toList(),
+    );
+    expect(
+      stored['payload'],
+      {'title': 'The Matrix Reloaded', 'year': 2003},
+    );
+    expect((await _getPoint(baseUrl, collectionName, uuid))['id'], uuid);
+
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
+}
+
+Future<Map<String, Object?>> _getPoint(
+  Uri baseUrl,
+  String collectionName,
+  Object id,
+) async {
+  final httpClient = HttpClient();
+  try {
+    final uri = baseUrl.resolveUri(Uri(
+      pathSegments: ['collections', collectionName, 'points', '$id'],
+      queryParameters: {'with_vector': 'true'},
+    ));
+    final request = await httpClient.getUrl(uri);
+    final response = await request.close();
+    final body = await utf8.decoder.bind(response).join();
+    expect(response.statusCode, HttpStatus.ok, reason: body);
+    final decoded = jsonDecode(body) as Map<String, dynamic>;
+    return Map<String, Object?>.from(decoded['result'] as Map);
+  } finally {
+    httpClient.close(force: true);
+  }
 }
