@@ -1,4 +1,9 @@
+library;
+
 import 'qdrant_transport.dart';
+import 'dart:convert';
+
+part 'qdrant_collections.dart';
 
 /// Configures a connection to a Qdrant server.
 ///
@@ -18,6 +23,7 @@ final class QdrantClient {
       apiKey: _validateApiKey(apiKey),
       timeout: this.timeout,
     );
+    collections = CollectionOperations._(_transport);
   }
 
   /// The default maximum duration for one HTTP request.
@@ -30,6 +36,9 @@ final class QdrantClient {
   final Duration timeout;
 
   late final QdrantTransport _transport;
+
+  /// Collection lifecycle operations supported by this SDK.
+  late final CollectionOperations collections;
 
   /// Releases HTTP resources held by this client.
   void close({bool force = false}) => _transport.close(force: force);

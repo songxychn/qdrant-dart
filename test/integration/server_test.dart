@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:qdrant_dart/qdrant_dart.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -43,4 +44,33 @@ void main() {
     tags: 'integration',
     timeout: const Timeout(Duration(seconds: 30)),
   );
+
+  test('collection lifecycle works against the pinned Qdrant image', () async {
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        'qdrant_dart_lifecycle',
+        vectors: VectorParams(size: 4, distance: Distance.cosine),
+      ),
+      isTrue,
+    );
+    expect(await client.collections.list(), contains('qdrant_dart_lifecycle'));
+
+    final collection = await client.collections.get('qdrant_dart_lifecycle');
+    expect(collection.name, 'qdrant_dart_lifecycle');
+    expect(collection.status, isNotEmpty);
+    expect(collection.vectors.size, 4);
+    expect(collection.vectors.distance, Distance.cosine);
+    expect(collection.pointsCount, 0);
+    expect(collection.indexedVectorsCount, 0);
+    expect(collection.segmentsCount, greaterThanOrEqualTo(1));
+
+    expect(await client.collections.delete('qdrant_dart_lifecycle'), isTrue);
+    expect(
+      await client.collections.list(),
+      isNot(contains('qdrant_dart_lifecycle')),
+    );
+  }, tags: 'integration');
 }

@@ -2,8 +2,8 @@
 
 An idiomatic, REST-first Dart SDK for [Qdrant](https://qdrant.tech/).
 
-> **Status:** foundation in progress. Client configuration and typed errors are
-> available; collection and point APIs have not been implemented or published.
+> **Status:** collection lifecycle is available for default dense vectors;
+> point APIs have not been implemented or published.
 
 ## Why this exists
 
@@ -42,9 +42,11 @@ Development is verified against `qdrant/qdrant:v1.18.2`. The version in
 [`tool/qdrant-version`](tool/qdrant-version) is the source of truth used by the
 integration harness.
 
-The foundation API supports HTTP/HTTPS client configuration, API-key
-authentication, request timeouts, and typed failure reporting. No collection
-or point endpoint is supported yet.
+The SDK supports HTTP/HTTPS client configuration, API-key authentication,
+request timeouts, typed failure reporting, and collection lifecycle operations
+against `qdrant/qdrant:v1.18.2`. Collection creation currently supports one
+default dense vector; named/sparse vectors and collection tuning are not yet
+supported.
 
 ## Client setup
 
@@ -62,8 +64,17 @@ final client = QdrantClient(
   apiKey: Platform.environment['QDRANT_API_KEY'],
 );
 
-// Collection and point operations will be added in later releases.
-client.close();
+try {
+  await client.collections.create(
+    'movies',
+    vectors: VectorParams(size: 4, distance: Distance.cosine),
+  );
+  final movies = await client.collections.get('movies');
+  print(movies.pointsCount);
+  await client.collections.delete('movies');
+} finally {
+  client.close();
+}
 ```
 
 When an operation fails, catch [QdrantException]. It includes the HTTP status
