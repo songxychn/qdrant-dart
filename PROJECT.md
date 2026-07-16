@@ -37,14 +37,17 @@ request context needed for debugging without exposing API keys.
 
 ## Delivery sequence
 
-### Milestone 0: foundation
+Milestone 0 and Milestone 1 are complete for v0.1.0. Milestone 2 has not
+started.
+
+### Milestone 0: foundation (complete)
 
 - Choose and document the first supported Qdrant server version.
 - Add a Docker-backed integration test harness.
 - Implement the client configuration and error model only after those tests
   exist.
 
-### Milestone 1: usable search client
+### Milestone 1: usable search client (complete for v0.1.0)
 
 - Collection lifecycle.
 - Point upsert, retrieve, delete, scroll, and query.
@@ -65,4 +68,3 @@ An endpoint is release-ready only when it has:
 2. A real-server integration test.
 3. Typed, documented failure behaviour.
 4. A compatibility declaration in the release notes.
-

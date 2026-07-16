@@ -2,8 +2,8 @@
 
 An idiomatic, REST-first Dart SDK for [Qdrant](https://qdrant.tech/).
 
-> **Status:** the v0.1 collection and core point endpoint set is available for
-> default dense vectors; release hardening is in progress.
+> **Status:** v0.1.0 is release-ready for collection lifecycle and core point
+> operations with default dense vectors.
 
 ## Why this exists
 
@@ -26,7 +26,7 @@ backends. Do not put a Qdrant Cloud API key in a mobile or browser app.
 - Each supported endpoint must be covered by a real Qdrant integration test,
   not only mocked HTTP tests.
 
-## First release: v0.1
+## v0.1 scope
 
 1. Client configuration, API-key authentication, timeouts, and typed errors.
 2. Collections: create, inspect, list, and delete.
@@ -35,6 +35,8 @@ backends. Do not put a Qdrant Cloud API key in a mobile or browser app.
 
 gRPC, cluster administration, snapshots, shard management, and local embedding
 inference are explicitly out of scope for v0.1.
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## Compatibility
 

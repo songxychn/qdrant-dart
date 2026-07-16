@@ -1,6 +1,6 @@
 name: qdrant_dart
 description: An idiomatic, REST-first Dart SDK for Qdrant.
-version: 0.0.1-dev
+version: 0.1.0
 repository: https://github.com/songxychn/qdrant-dart
 topics:
   - qdrant
