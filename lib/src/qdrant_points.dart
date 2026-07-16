@@ -145,6 +145,157 @@ final class ScrollPage {
   final Object? nextPageOffset;
 }
 
+/// A payload field condition used by Qdrant filters.
+final class FieldCondition {
+  /// Matches a keyword, integer, or boolean payload [value] at [key].
+  FieldCondition.match(String key, Object value)
+      : key = _validateKey(key),
+        matchValue = _validateMatchValue(value),
+        gt = null,
+        gte = null,
+        lt = null,
+        lte = null;
+
+  /// Matches numeric payload values within the provided bounds at [key].
+  FieldCondition.range(
+    String key, {
+    this.gt,
+    this.gte,
+    this.lt,
+    this.lte,
+  })  : key = _validateKey(key),
+        matchValue = null {
+    if (gt == null && gte == null && lt == null && lte == null) {
+      throw ArgumentError('At least one range bound must be provided.');
+    }
+    for (final bound in [gt, gte, lt, lte]) {
+      if (bound != null && !bound.isFinite) {
+        throw ArgumentError.value(bound, 'range bound', 'must be finite.');
+      }
+    }
+  }
+
+  /// The payload key, including dot notation for nested fields.
+  final String key;
+
+  /// The exact match value, or `null` for a range condition.
+  final Object? matchValue;
+
+  /// Exclusive lower bound.
+  final num? gt;
+
+  /// Inclusive lower bound.
+  final num? gte;
+
+  /// Exclusive upper bound.
+  final num? lt;
+
+  /// Inclusive upper bound.
+  final num? lte;
+
+  Map<String, Object> _toJson() => {
+        'key': key,
+        if (matchValue != null)
+          'match': {'value': matchValue!}
+        else
+          'range': {
+            if (gt != null) 'gt': gt!,
+            if (gte != null) 'gte': gte!,
+            if (lt != null) 'lt': lt!,
+            if (lte != null) 'lte': lte!,
+          },
+      };
+
+  static String _validateKey(String key) {
+    if (key.isEmpty) {
+      throw ArgumentError.value(key, 'key', 'must not be empty.');
+    }
+    return key;
+  }
+
+  static Object _validateMatchValue(Object value) {
+    if (value is! String && value is! int && value is! bool) {
+      throw ArgumentError.value(
+        value,
+        'value',
+        'must be a string, integer, or boolean.',
+      );
+    }
+    return value;
+  }
+}
+
+/// Qdrant payload filter clauses.
+final class Filter {
+  /// Creates a filter from AND [must], OR [should], and NOT [mustNot] clauses.
+  Filter({
+    Iterable<FieldCondition> must = const [],
+    Iterable<FieldCondition> should = const [],
+    Iterable<FieldCondition> mustNot = const [],
+  })  : must = List.unmodifiable(must),
+        should = List.unmodifiable(should),
+        mustNot = List.unmodifiable(mustNot) {
+    if (this.must.isEmpty && this.should.isEmpty && this.mustNot.isEmpty) {
+      throw ArgumentError('At least one filter condition must be provided.');
+    }
+  }
+
+  /// Conditions that must all match.
+  final List<FieldCondition> must;
+
+  /// Conditions where at least one must match.
+  final List<FieldCondition> should;
+
+  /// Conditions that must not match.
+  final List<FieldCondition> mustNot;
+
+  Map<String, Object> _toJson() => {
+        if (must.isNotEmpty)
+          'must': must.map((condition) => condition._toJson()).toList(),
+        if (should.isNotEmpty)
+          'should': should.map((condition) => condition._toJson()).toList(),
+        if (mustNot.isNotEmpty)
+          'must_not': mustNot.map((condition) => condition._toJson()).toList(),
+      };
+}
+
+/// A point and similarity score returned by a dense-vector query.
+final class ScoredPoint {
+  ScoredPoint._({
+    required this.id,
+    required this.score,
+    required this.vector,
+    required this.payload,
+  });
+
+  /// The point's non-negative integer or UUID identifier.
+  final Object id;
+
+  /// Qdrant's similarity score for this result.
+  final double score;
+
+  /// The default dense vector, or `null` when vectors were not requested.
+  final List<num>? vector;
+
+  /// The point metadata, or `null` when payloads were not requested.
+  final Map<String, Object?>? payload;
+
+  static ScoredPoint _fromJson(Object? value) {
+    final object = _jsonObject(value, 'query result point');
+    final record = PointRecord._fromJson(object);
+    final score = object['score'];
+    if (score is! num || !score.isFinite) {
+      throw FormatException('Qdrant response has an invalid point score.');
+    }
+    return ScoredPoint._(
+      id: record.id,
+      score: score.toDouble(),
+      vector: record.vector,
+      payload: record.payload,
+    );
+  }
+}
+
 /// Point operations for a [QdrantClient].
 final class PointOperations {
   PointOperations._(this._transport);
@@ -230,6 +381,7 @@ final class PointOperations {
     String collectionName, {
     Object? offset,
     int limit = 10,
+    Filter? filter,
     bool withPayload = true,
     bool withVector = false,
   }) async {
@@ -242,6 +394,7 @@ final class PointOperations {
       body: {
         if (offset != null) 'offset': Point._validatePointId(offset),
         'limit': limit,
+        if (filter != null) 'filter': filter._toJson(),
         'with_payload': withPayload,
         'with_vector': withVector,
       },
@@ -264,6 +417,7 @@ final class PointOperations {
   Stream<PointRecord> scrollAll(
     String collectionName, {
     int pageSize = 10,
+    Filter? filter,
     bool withPayload = true,
     bool withVector = false,
   }) async* {
@@ -273,6 +427,7 @@ final class PointOperations {
         collectionName,
         offset: offset,
         limit: pageSize,
+        filter: filter,
         withPayload: withPayload,
         withVector: withVector,
       );
@@ -281,6 +436,54 @@ final class PointOperations {
       }
       offset = page.nextPageOffset;
     } while (offset != null);
+  }
+
+  /// Finds points nearest to the default dense [vector].
+  Future<List<ScoredPoint>> query(
+    String collectionName,
+    List<num> vector, {
+    Filter? filter,
+    int limit = 10,
+    int offset = 0,
+    num? scoreThreshold,
+    bool withPayload = false,
+    bool withVector = false,
+  }) async {
+    if (limit <= 0) {
+      throw ArgumentError.value(limit, 'limit', 'must be positive.');
+    }
+    if (offset < 0) {
+      throw ArgumentError.value(offset, 'offset', 'must not be negative.');
+    }
+    if (scoreThreshold != null && !scoreThreshold.isFinite) {
+      throw ArgumentError.value(
+        scoreThreshold,
+        'scoreThreshold',
+        'must be finite.',
+      );
+    }
+    final queryVector = List<num>.unmodifiable(
+      Point._validateVector(vector),
+    );
+    final response = await _transport.send(
+      method: 'POST',
+      path: _pointsPath(collectionName, operation: 'query'),
+      body: {
+        'query': queryVector,
+        if (filter != null) 'filter': filter._toJson(),
+        'limit': limit,
+        'offset': offset,
+        if (scoreThreshold != null) 'score_threshold': scoreThreshold,
+        'with_payload': withPayload,
+        'with_vector': withVector,
+      },
+    );
+    final result = _jsonObject(_result(response), 'result');
+    final points = result['points'];
+    if (points is! List) {
+      throw FormatException('Qdrant response has no query point list.');
+    }
+    return points.map(ScoredPoint._fromJson).toList(growable: false);
   }
 
   Uri _pointsPath(

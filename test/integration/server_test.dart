@@ -193,11 +193,97 @@ void main() {
 
     expect(
       await client.points
-          .scrollAll(collectionName, pageSize: 2)
+          .scrollAll(
+            collectionName,
+            pageSize: 1,
+            filter: Filter(
+              must: [FieldCondition.match('page', 'first')],
+            ),
+          )
           .map((point) => point.id)
           .toList(),
-      [1, 2, 3],
+      [1, 2],
     );
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
+
+  test('point query applies payload filters against the pinned image',
+      () async {
+    const collectionName = 'qdrant_dart_query';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: VectorParams(size: 3, distance: Distance.dot),
+      ),
+      isTrue,
+    );
+    await client.points.upsert(collectionName, [
+      Point(
+        id: 1,
+        vector: [1, 0, 0],
+        payload: {'city': 'London', 'price': 100, 'active': true},
+      ),
+      Point(
+        id: 2,
+        vector: [0.8, 0.2, 0],
+        payload: {'city': 'London', 'price': 200, 'active': false},
+      ),
+      Point(
+        id: 3,
+        vector: [0, 1, 0],
+        payload: {'city': 'Berlin', 'price': 150, 'active': true},
+      ),
+      Point(
+        id: 4,
+        vector: [0.9, 0.1, 0],
+        payload: {'city': 'Berlin', 'price': 300, 'active': true},
+      ),
+    ]);
+
+    final matches = await client.points.query(
+      collectionName,
+      [1, 0, 0],
+      filter: Filter(
+        must: [
+          FieldCondition.match('city', 'London'),
+          FieldCondition.range('price', gte: 150),
+        ],
+        mustNot: [FieldCondition.match('active', true)],
+      ),
+      withPayload: true,
+      withVector: true,
+    );
+    expect(matches, hasLength(1));
+    expect(matches.single.id, 2);
+    expect(matches.single.score, closeTo(0.8, 0.000001));
+    expect(matches.single.payload?['price'], 200);
+    expect(matches.single.vector, [0.8, 0.2, 0.0]);
+
+    final alternatives = await client.points.query(
+      collectionName,
+      [1, 0, 0],
+      filter: Filter(
+        should: [
+          FieldCondition.match('city', 'Berlin'),
+          FieldCondition.range('price', lte: 100),
+        ],
+      ),
+    );
+    expect(alternatives.map((point) => point.id).toSet(), {1, 3, 4});
+
+    final secondStrongest = await client.points.query(
+      collectionName,
+      [1, 0, 0],
+      limit: 1,
+      offset: 1,
+      scoreThreshold: 0.85,
+    );
+    expect(secondStrongest.single.id, 4);
+    expect(secondStrongest.single.score, closeTo(0.9, 0.000001));
+
     expect(await client.collections.delete(collectionName), isTrue);
   }, tags: 'integration');
 }

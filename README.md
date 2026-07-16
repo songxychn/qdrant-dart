@@ -2,9 +2,8 @@
 
 An idiomatic, REST-first Dart SDK for [Qdrant](https://qdrant.tech/).
 
-> **Status:** collection lifecycle plus point upsert, retrieval, deletion, and
-> scrolling are available for default dense vectors; point queries are not yet
-> implemented or published.
+> **Status:** the v0.1 collection and core point endpoint set is available for
+> default dense vectors; release hardening is in progress.
 
 ## Why this exists
 
@@ -45,10 +44,11 @@ integration harness.
 
 The SDK supports HTTP/HTTPS client configuration, API-key authentication,
 request timeouts, typed failure reporting, and collection lifecycle operations
-plus point upsert, retrieval, ID-based deletion, and ID-ordered scrolling
-against `qdrant/qdrant:v1.18.2`. Collection creation and point operations
-currently support one default dense vector; named/sparse vectors and collection
-tuning are not yet supported.
+plus point upsert, retrieval, ID-based deletion, ID-ordered scrolling, and
+dense-vector queries with match/range payload filters against
+`qdrant/qdrant:v1.18.2`. Collection creation and point operations currently
+support one default dense vector; named/sparse vectors, nested filters, and
+collection tuning are not yet supported.
 
 ## Client setup
 
@@ -88,6 +88,15 @@ try {
   await for (final point in client.points.scrollAll('movies')) {
     print(point.id);
   }
+  final matches = await client.points.query(
+    'movies',
+    [0.9, 0.1, 0.1, 0.2],
+    filter: Filter(
+      must: [FieldCondition.match('year', 1999)],
+    ),
+    withPayload: true,
+  );
+  print(matches.single.score);
   await client.points.delete('movies', [1]);
   final movies = await client.collections.get('movies');
   print(movies.pointsCount);

@@ -123,6 +123,53 @@ void main() {
         client.points.scrollAll('movies', pageSize: 0),
         emitsError(isA<ArgumentError>()),
       );
+      await expectLater(
+        client.points.query('', [0.1]),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.query('movies', []),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.query('movies', [0.1], limit: 0),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.query('movies', [0.1], offset: -1),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.query(
+          'movies',
+          [0.1],
+          scoreThreshold: double.infinity,
+        ),
+        throwsArgumentError,
+      );
+    });
+  });
+
+  group('Filter', () {
+    test('validates match and range conditions', () {
+      expect(() => Filter(), throwsArgumentError);
+      expect(() => FieldCondition.match('', 'red'), throwsArgumentError);
+      expect(() => FieldCondition.match('price', 1.5), throwsArgumentError);
+      expect(() => FieldCondition.range('price'), throwsArgumentError);
+      expect(
+        () => FieldCondition.range('price', gt: double.infinity),
+        throwsArgumentError,
+      );
+
+      final filter = Filter(
+        must: [FieldCondition.match('city', 'London')],
+        should: [FieldCondition.match('available', true)],
+        mustNot: [FieldCondition.range('price', gt: 100, lte: 200)],
+      );
+      expect(filter.must.single.key, 'city');
+      expect(filter.should.single.matchValue, isTrue);
+      expect(filter.mustNot.single.gt, 100);
+      expect(filter.mustNot.single.lte, 200);
     });
   });
 
