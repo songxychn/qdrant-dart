@@ -127,6 +127,18 @@ dart test --exclude-tags integration
 The integration script starts the pinned Qdrant image on a random localhost
 port, runs the real-server tests, and removes the container afterward.
 
+## Releasing
+
+Releases are tag-driven. Update `pubspec.yaml` and `CHANGELOG.md` in the same
+commit, then create and push an annotated `v<version>` tag whose version exactly
+matches the package version. The publish workflow reruns the full CI suite and,
+only after it passes, uses GitHub OIDC and Dart's official reusable workflow to
+publish to pub.dev. No long-lived publishing token is stored in GitHub.
+
+Automated publishing must be enabled on the package's pub.dev Admin page for
+the `songxychn/qdrant-dart` repository with tag pattern `v{{version}}` and the
+required GitHub Actions environment `pub.dev`.
+
 ## For contributors and agents
 
 Read [PROJECT.md](PROJECT.md) for the roadmap and [AGENTS.md](AGENTS.md) for
