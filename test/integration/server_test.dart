@@ -75,7 +75,7 @@ void main() {
     );
   }, tags: 'integration');
 
-  test('point upsert works against the pinned Qdrant image', () async {
+  test('point upsert and retrieval work against the pinned image', () async {
     const collectionName = 'qdrant_dart_upsert';
     const uuid = '5c56c793-69f3-4fbf-87e6-c4bf54c28c26';
     final client = QdrantClient(baseUrl: baseUrl);
@@ -113,41 +113,36 @@ void main() {
     ]);
     expect(replacement.status, UpdateStatus.completed);
 
-    final stored = await _getPoint(baseUrl, collectionName, 1);
-    expect(stored['id'], 1);
+    final stored = (await client.points.retrieve(
+      collectionName,
+      [1],
+      withVector: true,
+    ))
+        .single;
+    expect(stored.id, 1);
     final norm = math.sqrt(vector.fold(0, (sum, value) => sum + value * value));
     expect(
-      stored['vector'],
+      stored.vector,
       vector.map((value) => closeTo(value / norm, 0.000001)).toList(),
     );
     expect(
-      stored['payload'],
+      stored.payload,
       {'title': 'The Matrix Reloaded', 'year': 2003},
     );
-    expect((await _getPoint(baseUrl, collectionName, uuid))['id'], uuid);
+    expect(
+      (await client.points.retrieve(collectionName, [uuid])).single.id,
+      uuid,
+    );
+
+    final idOnly = (await client.points.retrieve(
+      collectionName,
+      [1],
+      withPayload: false,
+    ))
+        .single;
+    expect(idOnly.payload, isNull);
+    expect(idOnly.vector, isNull);
 
     expect(await client.collections.delete(collectionName), isTrue);
   }, tags: 'integration');
-}
-
-Future<Map<String, Object?>> _getPoint(
-  Uri baseUrl,
-  String collectionName,
-  Object id,
-) async {
-  final httpClient = HttpClient();
-  try {
-    final uri = baseUrl.resolveUri(Uri(
-      pathSegments: ['collections', collectionName, 'points', '$id'],
-      queryParameters: {'with_vector': 'true'},
-    ));
-    final request = await httpClient.getUrl(uri);
-    final response = await request.close();
-    final body = await utf8.decoder.bind(response).join();
-    expect(response.statusCode, HttpStatus.ok, reason: body);
-    final decoded = jsonDecode(body) as Map<String, dynamic>;
-    return Map<String, Object?>.from(decoded['result'] as Map);
-  } finally {
-    httpClient.close(force: true);
-  }
 }

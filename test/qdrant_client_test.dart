@@ -72,7 +72,7 @@ void main() {
   });
 
   group('PointOperations', () {
-    test('rejects an empty collection name or point list', () async {
+    test('rejects invalid point operation inputs', () async {
       final client = QdrantClient(
         baseUrl: Uri.parse('http://127.0.0.1:6333'),
       );
@@ -85,6 +85,18 @@ void main() {
       );
       await expectLater(
         client.points.upsert('movies', []),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.retrieve('', [1]),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.retrieve('movies', []),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.retrieve('movies', [true]),
         throwsArgumentError,
       );
     });

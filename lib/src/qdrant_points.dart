@@ -83,6 +83,55 @@ final class UpdateResult {
   final UpdateStatus status;
 }
 
+/// A point returned by Qdrant.
+final class PointRecord {
+  PointRecord._({
+    required this.id,
+    required this.vector,
+    required this.payload,
+  });
+
+  /// The point's non-negative integer or UUID identifier.
+  final Object id;
+
+  /// The default dense vector, or `null` when vectors were not requested.
+  final List<num>? vector;
+
+  /// The point metadata, or `null` when payloads were not requested.
+  final Map<String, Object?>? payload;
+
+  static PointRecord _fromJson(Object? value) {
+    final record = _jsonObject(value, 'result point');
+    final id = switch (record['id']) {
+      int value when value >= 0 => value,
+      String value when value.isNotEmpty => value,
+      _ => throw FormatException('Qdrant response has an invalid point ID.'),
+    };
+
+    final vectorValue = record['vector'];
+    List<num>? vector;
+    if (vectorValue != null) {
+      if (vectorValue is! List ||
+          vectorValue.isEmpty ||
+          vectorValue.any((value) => value is! num || !value.isFinite)) {
+        throw FormatException(
+          'Qdrant response has an invalid default dense vector.',
+        );
+      }
+      vector = List<num>.unmodifiable(vectorValue);
+    }
+
+    final payloadValue = record['payload'];
+    return PointRecord._(
+      id: id,
+      vector: vector,
+      payload: payloadValue == null
+          ? null
+          : Map.unmodifiable(_jsonObject(payloadValue, 'result point payload')),
+    );
+  }
+}
+
 /// Point operations for a [QdrantClient].
 final class PointOperations {
   PointOperations._(this._transport);
@@ -97,13 +146,6 @@ final class PointOperations {
     Iterable<Point> points, {
     bool wait = true,
   }) async {
-    if (collectionName.isEmpty) {
-      throw ArgumentError.value(
-        collectionName,
-        'collectionName',
-        'must not be empty.',
-      );
-    }
     final pointList = points.toList(growable: false);
     if (pointList.isEmpty) {
       throw ArgumentError.value(points, 'points', 'must not be empty.');
@@ -111,16 +153,15 @@ final class PointOperations {
 
     final response = await _transport.send(
       method: 'PUT',
-      path: Uri(
-        pathSegments: ['collections', collectionName, 'points'],
+      path: _pointsPath(
+        collectionName,
         queryParameters: {'wait': wait.toString()},
       ),
       body: {
         'points': pointList.map((point) => point._toJson()).toList(),
       },
     );
-    final decoded = _jsonObject(jsonDecode(response.body), 'response');
-    final result = _jsonObject(decoded['result'], 'result');
+    final result = _jsonObject(_result(response), 'result');
     final operationId = result['operation_id'];
     if (operationId != null && operationId is! int) {
       throw FormatException(
@@ -132,4 +173,55 @@ final class PointOperations {
       status: UpdateStatus._fromJson(result['status']),
     );
   }
+
+  /// Retrieves existing points matching [ids] from [collectionName].
+  ///
+  /// Payloads are returned by default. Set [withVector] to true when the
+  /// default dense vectors are also needed.
+  Future<List<PointRecord>> retrieve(
+    String collectionName,
+    Iterable<Object> ids, {
+    bool withPayload = true,
+    bool withVector = false,
+  }) async {
+    final idList = ids.map(Point._validatePointId).toList(growable: false);
+    if (idList.isEmpty) {
+      throw ArgumentError.value(ids, 'ids', 'must not be empty.');
+    }
+
+    final response = await _transport.send(
+      method: 'POST',
+      path: _pointsPath(collectionName),
+      body: {
+        'ids': idList,
+        'with_payload': withPayload,
+        'with_vector': withVector,
+      },
+    );
+    final result = _result(response);
+    if (result is! List) {
+      throw FormatException('Qdrant response has no point list.');
+    }
+    return result.map(PointRecord._fromJson).toList(growable: false);
+  }
+
+  Uri _pointsPath(
+    String collectionName, {
+    Map<String, String>? queryParameters,
+  }) {
+    if (collectionName.isEmpty) {
+      throw ArgumentError.value(
+        collectionName,
+        'collectionName',
+        'must not be empty.',
+      );
+    }
+    return Uri(
+      pathSegments: ['collections', collectionName, 'points'],
+      queryParameters: queryParameters,
+    );
+  }
+
+  Object? _result(QdrantResponse response) =>
+      _jsonObject(jsonDecode(response.body), 'response')['result'];
 }
