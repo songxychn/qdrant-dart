@@ -107,6 +107,22 @@ void main() {
         client.points.delete('movies', []),
         throwsArgumentError,
       );
+      await expectLater(
+        client.points.scroll('', limit: 1),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.scroll('movies', limit: 0),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.scroll('movies', offset: true),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.scrollAll('movies', pageSize: 0),
+        emitsError(isA<ArgumentError>()),
+      );
     });
   });
 

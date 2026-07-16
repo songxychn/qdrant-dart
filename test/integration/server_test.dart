@@ -154,4 +154,50 @@ void main() {
 
     expect(await client.collections.delete(collectionName), isTrue);
   }, tags: 'integration');
+
+  test('point scrolling paginates against the pinned image', () async {
+    const collectionName = 'qdrant_dart_scroll';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: VectorParams(size: 2, distance: Distance.dot),
+      ),
+      isTrue,
+    );
+    await client.points.upsert(collectionName, [
+      Point(id: 1, vector: [1, 0], payload: {'page': 'first'}),
+      Point(id: 2, vector: [0, 1], payload: {'page': 'first'}),
+      Point(id: 3, vector: [1, 1], payload: {'page': 'second'}),
+    ]);
+
+    final firstPage = await client.points.scroll(
+      collectionName,
+      limit: 2,
+      withVector: true,
+    );
+    expect(firstPage.points.map((point) => point.id), [1, 2]);
+    expect(firstPage.points.first.payload, {'page': 'first'});
+    expect(firstPage.points.first.vector, [1.0, 0.0]);
+    expect(firstPage.nextPageOffset, 3);
+
+    final secondPage = await client.points.scroll(
+      collectionName,
+      offset: firstPage.nextPageOffset,
+      limit: 2,
+    );
+    expect(secondPage.points.map((point) => point.id), [3]);
+    expect(secondPage.nextPageOffset, isNull);
+
+    expect(
+      await client.points
+          .scrollAll(collectionName, pageSize: 2)
+          .map((point) => point.id)
+          .toList(),
+      [1, 2, 3],
+    );
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
 }

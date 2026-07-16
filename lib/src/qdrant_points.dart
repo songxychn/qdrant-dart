@@ -102,11 +102,7 @@ final class PointRecord {
 
   static PointRecord _fromJson(Object? value) {
     final record = _jsonObject(value, 'result point');
-    final id = switch (record['id']) {
-      int value when value >= 0 => value,
-      String value when value.isNotEmpty => value,
-      _ => throw FormatException('Qdrant response has an invalid point ID.'),
-    };
+    final id = _idFromJson(record['id']);
 
     final vectorValue = record['vector'];
     List<num>? vector;
@@ -130,6 +126,23 @@ final class PointRecord {
           : Map.unmodifiable(_jsonObject(payloadValue, 'result point payload')),
     );
   }
+
+  static Object _idFromJson(Object? value) => switch (value) {
+        int value when value >= 0 => value,
+        String value when value.isNotEmpty => value,
+        _ => throw FormatException('Qdrant response has an invalid point ID.'),
+      };
+}
+
+/// One page returned by Qdrant's point scroll endpoint.
+final class ScrollPage {
+  ScrollPage._({required this.points, required this.nextPageOffset});
+
+  /// Points in this page, sorted by ID when no custom ordering is used.
+  final List<PointRecord> points;
+
+  /// The offset for the next page, or `null` when this is the last page.
+  final Object? nextPageOffset;
 }
 
 /// Point operations for a [QdrantClient].
@@ -210,6 +223,64 @@ final class PointOperations {
       body: {'points': _pointIds(ids)},
     );
     return _updateResult(response);
+  }
+
+  /// Returns one ID-ordered page of points from [collectionName].
+  Future<ScrollPage> scroll(
+    String collectionName, {
+    Object? offset,
+    int limit = 10,
+    bool withPayload = true,
+    bool withVector = false,
+  }) async {
+    if (limit <= 0) {
+      throw ArgumentError.value(limit, 'limit', 'must be positive.');
+    }
+    final response = await _transport.send(
+      method: 'POST',
+      path: _pointsPath(collectionName, operation: 'scroll'),
+      body: {
+        if (offset != null) 'offset': Point._validatePointId(offset),
+        'limit': limit,
+        'with_payload': withPayload,
+        'with_vector': withVector,
+      },
+    );
+    final result = _jsonObject(_result(response), 'result');
+    final points = result['points'];
+    if (points is! List) {
+      throw FormatException('Qdrant response has no scroll point list.');
+    }
+    final nextPageOffset = result['next_page_offset'];
+    return ScrollPage._(
+      points: points.map(PointRecord._fromJson).toList(growable: false),
+      nextPageOffset: nextPageOffset == null
+          ? null
+          : PointRecord._idFromJson(nextPageOffset),
+    );
+  }
+
+  /// Streams every point in [collectionName] using ID-based pagination.
+  Stream<PointRecord> scrollAll(
+    String collectionName, {
+    int pageSize = 10,
+    bool withPayload = true,
+    bool withVector = false,
+  }) async* {
+    Object? offset;
+    do {
+      final page = await scroll(
+        collectionName,
+        offset: offset,
+        limit: pageSize,
+        withPayload: withPayload,
+        withVector: withVector,
+      );
+      for (final point in page.points) {
+        yield point;
+      }
+      offset = page.nextPageOffset;
+    } while (offset != null);
   }
 
   Uri _pointsPath(
