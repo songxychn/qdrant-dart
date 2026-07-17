@@ -60,7 +60,8 @@ replacing the rest of a point. Sparse-vector configuration currently uses
 Qdrant's defaults; nested payload filters and collection tuning are not yet
 supported. Large point iterables can be upserted in bounded sequential batches
 without hiding any per-batch update result. Query prefetches can select
-candidates with one vector before the main vector reranks them.
+candidates with one vector before the main vector reranks them, or combine
+dense and sparse rankings with Reciprocal Rank Fusion (RRF).
 
 ## Client setup
 
@@ -204,6 +205,22 @@ final reranked = await client.points.query(
     ),
   ],
   using: 'text',
+);
+final hybridMatches = await client.points.queryRrf(
+  'documents',
+  [
+    Prefetch(
+      query: DenseVector([0.8, 0.2, 0.1, 0.3]),
+      using: 'text',
+      limit: 20,
+    ),
+    Prefetch(
+      query: SparseVector(indices: [1, 5], values: [0.8, 0.4]),
+      using: 'keywords',
+      limit: 20,
+    ),
+  ],
+  withPayload: true,
 );
 await client.points.deleteVectors(
   'documents',

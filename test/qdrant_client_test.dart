@@ -175,6 +175,9 @@ void main() {
       );
       addTearDown(client.close);
       final point = Point(id: 1, vector: [0.1]);
+      final prefetch = [
+        Prefetch(query: DenseVector([0.1]))
+      ];
 
       await expectLater(
         client.points.upsert('', [point]),
@@ -344,6 +347,30 @@ void main() {
       );
       expect(
         () => Prefetch(query: DenseVector([0.1]), using: ''),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.queryRrf('movies', []),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.queryRrf('', prefetch),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.queryRrf(
+          'movies',
+          prefetch,
+          limit: 0,
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.queryRrf(
+          'movies',
+          prefetch,
+          offset: -1,
+        ),
         throwsArgumentError,
       );
     });

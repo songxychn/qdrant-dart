@@ -773,12 +773,7 @@ final class PointOperations {
     VectorSelector withVectors = const VectorSelector.none(),
   }) async {
     final prefetchList = prefetch.toList(growable: false);
-    if (limit <= 0) {
-      throw ArgumentError.value(limit, 'limit', 'must be positive.');
-    }
-    if (offset < 0) {
-      throw ArgumentError.value(offset, 'offset', 'must not be negative.');
-    }
+    _validateQueryWindow(limit, offset);
     if (scoreThreshold != null && !scoreThreshold.isFinite) {
       throw ArgumentError.value(
         scoreThreshold,
@@ -805,6 +800,48 @@ final class PointOperations {
         'with_vector': withVectors._toJson(),
       },
     );
+    return _queryPoints(response);
+  }
+
+  /// Fuses vector [prefetch] rankings using Reciprocal Rank Fusion.
+  Future<List<ScoredPoint>> queryRrf(
+    String collectionName,
+    Iterable<Prefetch> prefetch, {
+    int limit = 10,
+    int offset = 0,
+    bool withPayload = false,
+    VectorSelector withVectors = const VectorSelector.none(),
+  }) async {
+    final prefetchList = prefetch.toList(growable: false);
+    if (prefetchList.isEmpty) {
+      throw ArgumentError.value(prefetch, 'prefetch', 'must not be empty.');
+    }
+    _validateQueryWindow(limit, offset);
+    final response = await _transport.send(
+      method: 'POST',
+      path: _pointsPath(collectionName, operations: const ['query']),
+      body: {
+        'prefetch': prefetchList.map((query) => query._toJson()).toList(),
+        'query': const {'fusion': 'rrf'},
+        'limit': limit,
+        'offset': offset,
+        'with_payload': withPayload,
+        'with_vector': withVectors._toJson(),
+      },
+    );
+    return _queryPoints(response);
+  }
+
+  void _validateQueryWindow(int limit, int offset) {
+    if (limit <= 0) {
+      throw ArgumentError.value(limit, 'limit', 'must be positive.');
+    }
+    if (offset < 0) {
+      throw ArgumentError.value(offset, 'offset', 'must not be negative.');
+    }
+  }
+
+  List<ScoredPoint> _queryPoints(QdrantResponse response) {
     final result = _jsonObject(_result(response), 'result');
     final points = result['points'];
     if (points is! List) {
