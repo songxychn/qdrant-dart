@@ -2,13 +2,15 @@ part of 'qdrant_client.dart';
 
 /// A point to insert into or update in a Qdrant collection.
 final class Point {
-  /// Creates a point with a default dense [vector] and optional [payload].
+  /// Creates a point with a default dense [vector], optional named sparse
+  /// [sparseVectors], and optional [payload].
   Point({
     required Object id,
-    required List<num> vector,
+    required Iterable<num> vector,
+    Map<String, SparseVector> sparseVectors = const {},
     Map<String, Object?>? payload,
   })  : id = _validatePointId(id),
-        vectors = PointVectors._dense(vector),
+        vectors = PointVectors._dense(vector, sparse: sparseVectors),
         payload = payload == null ? null : Map.unmodifiable(payload);
 
   /// Creates a point with named dense or sparse [vectors].

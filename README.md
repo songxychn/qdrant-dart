@@ -58,11 +58,13 @@ with match/range payload filters, nested Boolean groups, and point-ID
 conditions against `qdrant/qdrant:v1.18.2`. Payload data can be set,
 overwritten, partially deleted, or cleared by point IDs or filters.
 Collection creation and point operations support one default dense vector or
-named dense and sparse vectors, and payload indexes can be created, inspected,
-and deleted. Selected vectors can be updated or named vectors deleted without
-replacing the rest of a point. Sparse-vector configuration currently uses
-Qdrant's defaults; nested payload filters and collection tuning beyond the
-optimizer indexing threshold are not yet supported. Large point iterables can
+named dense and sparse vectors. A default dense vector can also be stored with
+named sparse vectors, including an empty sparse vector. Payload indexes can be
+created, inspected, and deleted. Selected vectors can be updated or named
+vectors deleted without replacing the rest of a point. Sparse-vector
+configuration currently uses Qdrant's defaults; nested payload filters and
+collection tuning beyond the optimizer indexing threshold are not yet
+supported. Large point iterables can
 be upserted in bounded sequential batches without hiding any per-batch update
 result. Query prefetches can select
 candidates with one vector before the main vector reranks them, or combine
@@ -244,6 +246,26 @@ await client.points.deleteVectors(
   'documents',
   ['keywords'],
   PointSelector.ids([1]),
+);
+```
+
+Collections with a default dense vector can add named sparse vectors to the
+same point:
+
+```dart
+await client.collections.create(
+  'documents',
+  vectors: CollectionVectors.dense(
+    DenseVectorParams(size: 4, distance: Distance.cosine),
+    sparse: const {'keywords': SparseVectorParams()},
+  ),
+);
+final point = Point(
+  id: 1,
+  vector: [0.9, 0.1, 0.1, 0.2],
+  sparseVectors: {
+    'keywords': SparseVector(indices: [1, 5], values: [0.8, 0.4]),
+  },
 );
 ```
 

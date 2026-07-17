@@ -211,9 +211,9 @@ final class SparseVector extends VectorValue {
     required Iterable<num> values,
   })  : indices = List.unmodifiable(indices),
         values = List.unmodifiable(values) {
-    if (this.indices.isEmpty || this.indices.length != this.values.length) {
+    if (this.indices.length != this.values.length) {
       throw ArgumentError(
-        'Sparse vector indices and values must be non-empty and equal length.',
+        'Sparse vector indices and values must have equal lengths.',
       );
     }
     if (this.indices.any((index) => index < 0) ||
@@ -275,9 +275,13 @@ final class PointVectors {
   /// Named dense and sparse vectors.
   final Map<String, VectorValue> named;
 
-  static PointVectors _dense(Iterable<num> values) => PointVectors._(
+  static PointVectors _dense(
+    Iterable<num> values, {
+    Map<String, SparseVector> sparse = const {},
+  }) =>
+      PointVectors._(
         defaultDense: DenseVector(values),
-        named: const {},
+        named: Map.unmodifiable(_validateNamedMap(sparse, 'sparse')),
       );
 
   static PointVectors _named(Map<String, VectorValue> vectors) {
@@ -291,9 +295,15 @@ final class PointVectors {
     );
   }
 
-  Object _toJson() =>
-      defaultDense?._toJson() ??
-      named.map((name, vector) => MapEntry(name, vector._toJson()));
+  Object _toJson() {
+    if (named.isEmpty) {
+      return defaultDense!._toJson();
+    }
+    return {
+      if (defaultDense != null) '': defaultDense!._toJson(),
+      ...named.map((name, vector) => MapEntry(name, vector._toJson())),
+    };
+  }
 
   static PointVectors _fromJson(Object? value) {
     if (value is List) {
@@ -302,11 +312,18 @@ final class PointVectors {
         named: const {},
       );
     }
-    final named = _jsonObject(value, 'point vectors').map(
+    final values = _jsonObject(value, 'point vectors');
+    final defaultValue = values.remove('');
+    final defaultVector =
+        defaultValue == null ? null : VectorValue._fromJson(defaultValue);
+    if (defaultVector != null && defaultVector is! DenseVector) {
+      throw FormatException('Qdrant response has an invalid default vector.');
+    }
+    final named = values.map(
       (name, vector) => MapEntry(name, VectorValue._fromJson(vector)),
     );
     return PointVectors._(
-      defaultDense: null,
+      defaultDense: defaultVector as DenseVector?,
       named: Map.unmodifiable(named),
     );
   }

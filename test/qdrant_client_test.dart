@@ -65,6 +65,12 @@ void main() {
       expect(point.vectors.defaultDense?.values, [0.1, 0.2]);
       expect(point.payload, {'kind': 'example'});
       expect(uuidPoint.id, '5c56c793-69f3-4fbf-87e6-c4bf54c28c26');
+
+      final iterablePoint = Point(
+        id: 2,
+        vector: [0.3, 0.4].where((value) => value > 0),
+      );
+      expect(iterablePoint.vector, [0.3, 0.4]);
     });
 
     test('accepts named dense and sparse vectors and copies inputs', () {
@@ -91,6 +97,19 @@ void main() {
       final sparse = point.vectors.named['keywords'] as SparseVector;
       expect(sparse.indices, [1, 4]);
       expect(sparse.values, [0.3, 0.7]);
+
+      final mixed = Point(
+        id: 2,
+        vector: [0.1, 0.2],
+        sparseVectors: {
+          'keywords': SparseVector(indices: const [], values: const []),
+        },
+      );
+      expect(mixed.vector, [0.1, 0.2]);
+      expect(
+        (mixed.vectors.named['keywords'] as SparseVector).indices,
+        isEmpty,
+      );
     });
 
     test('rejects unsupported IDs and invalid vectors', () {
