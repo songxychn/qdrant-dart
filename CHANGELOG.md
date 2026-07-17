@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.0 - 2026-07-17
+
+- Added payload set, overwrite, key deletion, and clear operations for point-ID
+  and filter selectors.
+- Added partial default, named dense, and sparse vector updates plus named
+  vector deletion without replacing the rest of a point.
+- Added filter-based point deletion and exact or approximate point counts.
+- Added bounded sequential batch upserts that return every Qdrant
+  `UpdateResult` in request order.
+- Added real-server coverage for every new operation against the minimum
+  supported `qdrant/qdrant:v1.12.0` and target `qdrant/qdrant:v1.18.2`
+  images.
+
+This release completes the production data lifecycle milestone. Its public
+surface remains REST-first and standard-library-only; it does not add retries,
+concurrent ingestion, embeddings, or framework-specific abstractions.
+
 ## 0.2.0 - 2026-07-17
 
 - Added named dense and sparse vector configuration, point values, response

@@ -2,9 +2,9 @@
 
 An idiomatic, REST-first Dart SDK for [Qdrant](https://qdrant.tech/).
 
-> **Status:** v0.2.0 is release-ready for collection lifecycle, core point
-> operations, named dense and sparse vectors, extensible filters, and payload
-> indexes.
+> **Status:** v0.3.0 is release-ready for collection lifecycle, typed search,
+> payload and vector maintenance, filtered deletion and counts, and bounded
+> batch ingestion.
 
 ## Why this exists
 
