@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.0 - 2026-07-17
+
+- Made `CollectionInfo.pointsCount` and `indexedVectorsCount` nullable to
+  match Qdrant `v1.12.0` through `v1.18.2` when statistics are unavailable.
+- Made `VectorValue` and `FilterCondition` SDK-owned, non-sealed hierarchies so
+  future protocol variants do not require callers to handle them exhaustively.
+- Made `PointSelector.filter` require a non-null filter and reject base URLs
+  containing user info so credentials cannot appear in diagnostics.
+- Accepted empty sparse vectors, widened default dense point inputs to any
+  `Iterable<num>`, and added default-dense plus named-sparse points.
+- Mapped incompatible successful responses to `QdrantException` with HTTP and
+  request context instead of leaking a bare `FormatException`.
+- Added real-server coverage for sparse-only and mixed default-dense/sparse
+  collections against both supported Qdrant images, plus a Dart 3.0.7 CI gate.
+- Published the compatibility and deprecation policy for the v1 API freeze.
+
+This is the final pre-v1 API candidate. Migrating from v0.5 requires handling
+nullable collection counts and avoiding exhaustive switches over
+`VectorValue` or `FilterCondition`. Code that passed `null` to
+`PointSelector.filter` or embedded credentials in `baseUrl` must use a real
+`Filter` or the `apiKey` parameter respectively.
+
 ## 0.5.0 - 2026-07-17
 
 - Added atomic collection-alias creation, deletion, renaming, global listing,

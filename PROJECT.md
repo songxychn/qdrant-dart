@@ -37,8 +37,8 @@ request context needed for debugging without exposing API keys.
 
 ## Delivery sequence
 
-Milestones 0 through 5 are complete through v0.5.0. The next release focuses on
-stabilizing the supported API for v1.0.0.
+Milestones 0 through 6 are complete through v0.6.0. The next release freezes
+the supported API as v1.0.0 after feedback on this release candidate.
 
 ### Milestone 0: foundation (complete)
 
@@ -87,9 +87,19 @@ stabilizing the supported API for v1.0.0.
 - Defer snapshots, shard administration, and cluster management until user
   demand justifies their maintenance cost.
 
+### Milestone 6: API stabilization (complete for v0.6.0)
+
+- Align nullable collection statistics and empty sparse vectors with the
+  supported Qdrant protocol versions.
+- Keep SDK-owned request hierarchies extensible and make invalid public inputs
+  unrepresentable where practical.
+- Preserve typed request context for transport, server, and response-protocol
+  failures.
+- Publish the compatibility and deprecation policy and continuously verify the
+  minimum Dart SDK.
+
 ### Stable API (v1.0.0)
 
-- Publish a compatibility and deprecation policy.
 - Freeze the core vector, filter, collection, and point models.
 - Complete migration guidance and end-to-end examples.
 

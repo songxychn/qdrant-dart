@@ -11,7 +11,20 @@ permissions:
   contents: read
 
 jobs:
+  minimum-dart:
+    name: Dart 3.0
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: 3.0.7
+      - run: dart pub get
+      - run: dart analyze --fatal-infos
+      - run: dart test --exclude-tags integration
+
   test:
+    name: Latest Dart and Qdrant compatibility
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

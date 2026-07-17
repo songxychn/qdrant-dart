@@ -2,9 +2,9 @@
 
 An idiomatic, REST-first Dart SDK for [Qdrant](https://qdrant.tech/).
 
-> **Status:** v0.5.0 is release-ready for collection lifecycle, production data
-> maintenance, atomic collection aliases, bounded indexing-threshold tuning,
-> and named dense/sparse search with multi-stage prefetch and RRF fusion.
+> **Status:** v0.6.0 is the release-ready API candidate for v1. It covers
+> collection lifecycle, production data maintenance, atomic aliases, bounded
+> indexing-threshold tuning, and dense/sparse search with prefetch and RRF.
 
 ## Why this exists
 
@@ -290,6 +290,30 @@ when Qdrant responded, its error message when available, and the request method
 and URL. Successful responses that do not match the supported Qdrant protocol
 are reported the same way, with the parsing failure in `cause`. It never
 includes the API key.
+
+## Versioning and compatibility policy
+
+Until v1.0.0, minor releases may contain documented source-breaking changes
+needed to make the API durable. Each such change includes migration notes in
+the changelog.
+
+Starting with v1.0.0, this package follows semantic versioning:
+
+- Patch releases contain compatible fixes and documentation changes.
+- Minor releases may add endpoints, optional parameters, methods, and
+  SDK-owned implementation subtypes. Callers must not exhaustively switch on
+  `VectorValue` or `FilterCondition`.
+- Removing or changing public members, adding public enum values, raising the
+  minimum Dart SDK, or raising the minimum supported Qdrant version requires a
+  major release.
+- A public member is normally deprecated for at least one minor release before
+  removal in the next major release.
+
+Every release declares the minimum supported and current target Qdrant
+versions through the two files under `tool/` and runs the full integration
+suite against both. CI also analyzes and unit-tests the package on Dart 3.0.7,
+the current minimum SDK, and runs the full release bar on the latest stable
+Dart SDK.
 
 ## Development
 
