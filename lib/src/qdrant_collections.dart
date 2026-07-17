@@ -26,11 +26,11 @@ final class CollectionInfo {
   /// Payload indexes keyed by field name.
   final Map<String, PayloadIndexInfo> payloadIndexes;
 
-  /// The current number of points in the collection.
-  final int pointsCount;
+  /// The current number of points, or `null` when Qdrant does not report it.
+  final int? pointsCount;
 
-  /// The current number of vectors indexed by Qdrant.
-  final int indexedVectorsCount;
+  /// The number of indexed vectors, or `null` when Qdrant does not report it.
+  final int? indexedVectorsCount;
 
   /// The current number of Qdrant segments in the collection.
   final int segmentsCount;
@@ -86,8 +86,11 @@ final class CollectionOperations {
           ),
         ),
       ),
-      pointsCount: _integer(result['points_count'], 'result.points_count'),
-      indexedVectorsCount: _integer(
+      pointsCount: _optionalInteger(
+        result['points_count'],
+        'result.points_count',
+      ),
+      indexedVectorsCount: _optionalInteger(
         result['indexed_vectors_count'],
         'result.indexed_vectors_count',
       ),
@@ -196,3 +199,6 @@ int _integer(Object? value, String name) {
   }
   return value;
 }
+
+int? _optionalInteger(Object? value, String name) =>
+    value == null ? null : _integer(value, name);

@@ -139,6 +139,43 @@ void main() {
   });
 
   group('CollectionOperations', () {
+    test('accepts collection counts omitted by Qdrant', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final client = QdrantClient(
+        baseUrl: Uri.parse('http://${server.address.address}:${server.port}'),
+      );
+      addTearDown(() async {
+        client.close(force: true);
+        await server.close(force: true);
+      });
+      server.listen((request) async {
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..write(jsonEncode({
+            'result': {
+              'status': 'green',
+              'points_count': null,
+              'indexed_vectors_count': null,
+              'segments_count': 1,
+              'payload_schema': <String, Object?>{},
+              'config': {
+                'params': {
+                  'vectors': {'size': 2, 'distance': 'Dot'},
+                  'sparse_vectors': null,
+                },
+                'optimizer_config': {'indexing_threshold': 20000},
+              },
+            },
+          }));
+        await request.response.close();
+      });
+
+      final collection = await client.collections.get('movies');
+
+      expect(collection.pointsCount, isNull);
+      expect(collection.indexedVectorsCount, isNull);
+    });
+
     test('rejects invalid indexing threshold updates', () async {
       final client = QdrantClient(
         baseUrl: Uri.parse('http://127.0.0.1:6333'),
