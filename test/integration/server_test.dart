@@ -358,6 +358,23 @@ void main() {
     );
     expect(alternatives.map((point) => point.id).toSet(), {1, 3, 4});
 
+    final grouped = await client.points.query(
+      collectionName,
+      DenseVector([1, 0, 0]),
+      filter: Filter(
+        must: [
+          HasIdCondition([2, 3, 4]),
+          Filter(
+            should: [
+              FieldCondition.match('city', 'London'),
+              FieldCondition.range('price', gte: 300),
+            ],
+          ),
+        ],
+      ),
+    );
+    expect(grouped.map((point) => point.id).toSet(), {2, 4});
+
     final secondStrongest = await client.points.query(
       collectionName,
       DenseVector([1, 0, 0]),

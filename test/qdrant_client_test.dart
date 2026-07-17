@@ -224,20 +224,32 @@ void main() {
       expect(() => FieldCondition.match('', 'red'), throwsArgumentError);
       expect(() => FieldCondition.match('price', 1.5), throwsArgumentError);
       expect(() => FieldCondition.range('price'), throwsArgumentError);
+      expect(() => HasIdCondition([]), throwsArgumentError);
+      expect(() => HasIdCondition([true]), throwsArgumentError);
       expect(
         () => FieldCondition.range('price', gt: double.infinity),
         throwsArgumentError,
       );
 
       final filter = Filter(
-        must: [FieldCondition.match('city', 'London')],
+        must: [
+          HasIdCondition([1, 2]),
+          Filter(
+            should: [
+              FieldCondition.match('city', 'London'),
+              FieldCondition.range('price', lte: 100),
+            ],
+          ),
+        ],
         should: [FieldCondition.match('available', true)],
         mustNot: [FieldCondition.range('price', gt: 100, lte: 200)],
       );
-      expect(filter.must.single.key, 'city');
-      expect(filter.should.single.matchValue, isTrue);
-      expect(filter.mustNot.single.gt, 100);
-      expect(filter.mustNot.single.lte, 200);
+      expect((filter.must.first as HasIdCondition).ids, [1, 2]);
+      final nested = filter.must.last as Filter;
+      expect((nested.should.first as FieldCondition).key, 'city');
+      expect((filter.should.single as FieldCondition).matchValue, isTrue);
+      expect((filter.mustNot.single as FieldCondition).gt, 100);
+      expect((filter.mustNot.single as FieldCondition).lte, 200);
     });
   });
 

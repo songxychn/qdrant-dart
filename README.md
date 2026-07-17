@@ -47,11 +47,11 @@ integration harness.
 The SDK supports HTTP/HTTPS client configuration, API-key authentication,
 request timeouts, typed failure reporting, and collection lifecycle operations
 plus point upsert, retrieval, ID-based deletion, ID-ordered scrolling, and
-dense-vector queries with match/range payload filters against
-`qdrant/qdrant:v1.18.2`. Collection creation and point operations support one
-default dense vector or named dense and sparse vectors. Sparse-vector
-configuration currently uses Qdrant's defaults; nested filters and collection
-tuning are not yet supported.
+dense-vector queries with match/range payload filters, nested Boolean groups,
+and point-ID conditions against `qdrant/qdrant:v1.18.2`. Collection creation
+and point operations support one default dense vector or named dense and sparse
+vectors. Sparse-vector configuration currently uses Qdrant's defaults; nested
+payload filters and collection tuning are not yet supported.
 
 ## Client setup
 
@@ -97,7 +97,10 @@ try {
     'movies',
     DenseVector([0.9, 0.1, 0.1, 0.2]),
     filter: Filter(
-      must: [FieldCondition.match('year', 1999)],
+      must: [
+        HasIdCondition([1]),
+        FieldCondition.match('year', 1999),
+      ],
     ),
     withPayload: true,
   );

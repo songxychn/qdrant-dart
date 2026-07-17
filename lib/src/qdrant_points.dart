@@ -138,8 +138,15 @@ final class ScrollPage {
   final Object? nextPageOffset;
 }
 
+/// A condition accepted in Qdrant filter clauses.
+sealed class FilterCondition {
+  const FilterCondition();
+
+  Map<String, Object> _toJson();
+}
+
 /// A payload field condition used by Qdrant filters.
-final class FieldCondition {
+final class FieldCondition extends FilterCondition {
   /// Matches a keyword, integer, or boolean payload [value] at [key].
   FieldCondition.match(String key, Object value)
       : key = _validateKey(key),
@@ -147,7 +154,8 @@ final class FieldCondition {
         gt = null,
         gte = null,
         lt = null,
-        lte = null;
+        lte = null,
+        super();
 
   /// Matches numeric payload values within the provided bounds at [key].
   FieldCondition.range(
@@ -157,7 +165,8 @@ final class FieldCondition {
     this.lt,
     this.lte,
   })  : key = _validateKey(key),
-        matchValue = null {
+        matchValue = null,
+        super() {
     if (gt == null && gte == null && lt == null && lte == null) {
       throw ArgumentError('At least one range bound must be provided.');
     }
@@ -186,6 +195,7 @@ final class FieldCondition {
   /// Inclusive upper bound.
   final num? lte;
 
+  @override
   Map<String, Object> _toJson() => {
         'key': key,
         if (matchValue != null)
@@ -218,30 +228,49 @@ final class FieldCondition {
   }
 }
 
+/// Matches points whose IDs are included in [ids].
+final class HasIdCondition extends FilterCondition {
+  /// Creates a point-ID filter condition.
+  HasIdCondition(Iterable<Object> ids)
+      : ids = List.unmodifiable(ids.map(Point._validatePointId)) {
+    if (this.ids.isEmpty) {
+      throw ArgumentError.value(ids, 'ids', 'must not be empty.');
+    }
+  }
+
+  /// Point IDs that satisfy this condition.
+  final List<Object> ids;
+
+  @override
+  Map<String, Object> _toJson() => {'has_id': ids};
+}
+
 /// Qdrant payload filter clauses.
-final class Filter {
+final class Filter extends FilterCondition {
   /// Creates a filter from AND [must], OR [should], and NOT [mustNot] clauses.
   Filter({
-    Iterable<FieldCondition> must = const [],
-    Iterable<FieldCondition> should = const [],
-    Iterable<FieldCondition> mustNot = const [],
+    Iterable<FilterCondition> must = const [],
+    Iterable<FilterCondition> should = const [],
+    Iterable<FilterCondition> mustNot = const [],
   })  : must = List.unmodifiable(must),
         should = List.unmodifiable(should),
-        mustNot = List.unmodifiable(mustNot) {
+        mustNot = List.unmodifiable(mustNot),
+        super() {
     if (this.must.isEmpty && this.should.isEmpty && this.mustNot.isEmpty) {
       throw ArgumentError('At least one filter condition must be provided.');
     }
   }
 
   /// Conditions that must all match.
-  final List<FieldCondition> must;
+  final List<FilterCondition> must;
 
   /// Conditions where at least one must match.
-  final List<FieldCondition> should;
+  final List<FilterCondition> should;
 
   /// Conditions that must not match.
-  final List<FieldCondition> mustNot;
+  final List<FilterCondition> mustNot;
 
+  @override
   Map<String, Object> _toJson() => {
         if (must.isNotEmpty)
           'must': must.map((condition) => condition._toJson()).toList(),
