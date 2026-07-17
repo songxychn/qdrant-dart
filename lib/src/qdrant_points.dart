@@ -308,6 +308,43 @@ final class PointSelector {
       };
 }
 
+/// A candidate-producing sub-query run before the main Query API request.
+final class Prefetch {
+  /// Creates a vector prefetch using the default vector or named [using].
+  Prefetch({
+    required this.query,
+    this.using,
+    this.filter,
+    this.limit = 10,
+  }) {
+    if (limit <= 0) {
+      throw ArgumentError.value(limit, 'limit', 'must be positive.');
+    }
+    if (using != null) {
+      _validateVectorName(using!, 'using');
+    }
+  }
+
+  /// Dense or sparse vector used to select candidates.
+  final VectorValue query;
+
+  /// Named vector to query, or `null` for the default vector.
+  final String? using;
+
+  /// Optional payload filter applied while selecting candidates.
+  final Filter? filter;
+
+  /// Maximum number of candidates returned to the main query.
+  final int limit;
+
+  Map<String, Object> _toJson() => {
+        'query': query._toJson(),
+        if (using != null) 'using': using!,
+        if (filter != null) 'filter': filter!._toJson(),
+        'limit': limit,
+      };
+}
+
 /// A point and similarity score returned by a dense-vector query.
 final class ScoredPoint {
   ScoredPoint._({
@@ -726,6 +763,7 @@ final class PointOperations {
   Future<List<ScoredPoint>> query(
     String collectionName,
     VectorValue vector, {
+    Iterable<Prefetch> prefetch = const [],
     String? using,
     Filter? filter,
     int limit = 10,
@@ -734,6 +772,7 @@ final class PointOperations {
     bool withPayload = false,
     VectorSelector withVectors = const VectorSelector.none(),
   }) async {
+    final prefetchList = prefetch.toList(growable: false);
     if (limit <= 0) {
       throw ArgumentError.value(limit, 'limit', 'must be positive.');
     }
@@ -754,6 +793,8 @@ final class PointOperations {
       method: 'POST',
       path: _pointsPath(collectionName, operations: const ['query']),
       body: {
+        if (prefetchList.isNotEmpty)
+          'prefetch': prefetchList.map((query) => query._toJson()).toList(),
         'query': vector._toJson(),
         if (using != null) 'using': using,
         if (filter != null) 'filter': filter._toJson(),

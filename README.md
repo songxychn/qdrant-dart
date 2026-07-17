@@ -59,7 +59,8 @@ and deleted. Selected vectors can be updated or named vectors deleted without
 replacing the rest of a point. Sparse-vector configuration currently uses
 Qdrant's defaults; nested payload filters and collection tuning are not yet
 supported. Large point iterables can be upserted in bounded sequential batches
-without hiding any per-batch update result.
+without hiding any per-batch update result. Query prefetches can select
+candidates with one vector before the main vector reranks them.
 
 ## Client setup
 
@@ -191,6 +192,18 @@ final sparseMatches = await client.points.query(
   SparseVector(indices: [1, 5], values: [0.8, 0.4]),
   using: 'keywords',
   withVectors: VectorSelector.named(['text']),
+);
+final reranked = await client.points.query(
+  'documents',
+  DenseVector([0.8, 0.2, 0.1, 0.3]),
+  prefetch: [
+    Prefetch(
+      query: SparseVector(indices: [1, 5], values: [0.8, 0.4]),
+      using: 'keywords',
+      limit: 20,
+    ),
+  ],
+  using: 'text',
 );
 await client.points.deleteVectors(
   'documents',

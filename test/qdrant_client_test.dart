@@ -338,6 +338,14 @@ void main() {
         client.points.query('movies', DenseVector([0.1]), using: ''),
         throwsArgumentError,
       );
+      expect(
+        () => Prefetch(query: DenseVector([0.1]), limit: 0),
+        throwsArgumentError,
+      );
+      expect(
+        () => Prefetch(query: DenseVector([0.1]), using: ''),
+        throwsArgumentError,
+      );
     });
   });
 

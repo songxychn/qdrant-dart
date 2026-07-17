@@ -496,6 +496,73 @@ void main() {
     expect(await client.collections.delete(collectionName), isTrue);
   }, tags: 'integration');
 
+  test('query prefetch limits candidates before reranking', () async {
+    const collectionName = 'qdrant_dart_prefetch';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: CollectionVectors.named(
+          dense: {
+            'coarse': DenseVectorParams(size: 2, distance: Distance.dot),
+            'fine': DenseVectorParams(size: 2, distance: Distance.dot),
+          },
+        ),
+      ),
+      isTrue,
+    );
+    await client.points.upsert(collectionName, [
+      Point.named(
+        id: 1,
+        vectors: {
+          'coarse': DenseVector([1, 0]),
+          'fine': DenseVector([0, 1]),
+        },
+        payload: {'eligible': true},
+      ),
+      Point.named(
+        id: 2,
+        vectors: {
+          'coarse': DenseVector([0.9, 0.1]),
+          'fine': DenseVector([1, 0]),
+        },
+        payload: {'eligible': true},
+      ),
+      Point.named(
+        id: 3,
+        vectors: {
+          'coarse': DenseVector([0, 1]),
+          'fine': DenseVector([1, 0]),
+        },
+        payload: {'eligible': false},
+      ),
+    ]);
+
+    final matches = await client.points.query(
+      collectionName,
+      DenseVector([1, 0]),
+      prefetch: [
+        Prefetch(
+          query: DenseVector([1, 0]),
+          using: 'coarse',
+          filter: Filter(
+            must: [FieldCondition.match('eligible', true)],
+          ),
+          limit: 2,
+        ),
+      ],
+      using: 'fine',
+      limit: 1,
+      withPayload: true,
+    );
+    expect(matches.single.id, 2);
+    expect(matches.single.payload, {'eligible': true});
+
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
+
   test('vector updates and deletion work against the pinned image', () async {
     const collectionName = 'qdrant_dart_vector_updates';
     final client = QdrantClient(baseUrl: baseUrl);
