@@ -19,6 +19,17 @@ Future<void> main() async {
         DenseVectorParams(size: 4, distance: Distance.cosine),
       ),
     );
+    await client.aliases.update([
+      CollectionAliasAction.create(
+        collectionName: collectionName,
+        aliasName: '${collectionName}_current',
+      ),
+    ]);
+    print(
+      (await client.aliases.list(collectionName: collectionName))
+          .single
+          .aliasName,
+    );
     await client.payloadIndexes.create(
       collectionName,
       'year',
@@ -57,6 +68,9 @@ Future<void> main() async {
   } finally {
     try {
       if (created) {
+        await client.aliases.update([
+          CollectionAliasAction.delete('${collectionName}_current'),
+        ]);
         await client.collections.delete(collectionName);
       }
     } finally {

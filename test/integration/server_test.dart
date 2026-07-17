@@ -78,6 +78,79 @@ void main() {
     );
   }, tags: 'integration');
 
+  test('collection alias lifecycle works against the pinned image', () async {
+    const firstCollection = 'qdrant_dart_aliases_first';
+    const secondCollection = 'qdrant_dart_aliases_second';
+    const aliasName = 'qdrant_dart_current';
+    const renamedAlias = 'qdrant_dart_live';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    for (final name in [firstCollection, secondCollection]) {
+      expect(
+        await client.collections.create(
+          name,
+          vectors: CollectionVectors.dense(
+            DenseVectorParams(size: 2, distance: Distance.dot),
+          ),
+        ),
+        isTrue,
+      );
+    }
+
+    expect(
+      await client.aliases.update([
+        CollectionAliasAction.create(
+          collectionName: firstCollection,
+          aliasName: aliasName,
+        ),
+      ]),
+      isTrue,
+    );
+    final firstAliases = await client.aliases.list(
+      collectionName: firstCollection,
+    );
+    expect(firstAliases.single.aliasName, aliasName);
+    expect(firstAliases.single.collectionName, firstCollection);
+
+    expect(
+      await client.aliases.update([
+        CollectionAliasAction.rename(
+          oldAliasName: aliasName,
+          newAliasName: renamedAlias,
+        ),
+      ]),
+      isTrue,
+    );
+    expect((await client.aliases.list()).single.aliasName, renamedAlias);
+
+    expect(
+      await client.aliases.update([
+        CollectionAliasAction.delete(renamedAlias),
+        CollectionAliasAction.create(
+          collectionName: secondCollection,
+          aliasName: renamedAlias,
+        ),
+      ]),
+      isTrue,
+    );
+    final secondAliases = await client.aliases.list(
+      collectionName: secondCollection,
+    );
+    expect(secondAliases.single.collectionName, secondCollection);
+
+    expect(
+      await client.aliases.update([
+        CollectionAliasAction.delete(renamedAlias),
+      ]),
+      isTrue,
+    );
+    expect(await client.aliases.list(), isEmpty);
+    for (final name in [firstCollection, secondCollection]) {
+      expect(await client.collections.delete(name), isTrue);
+    }
+  }, tags: 'integration');
+
   test('real server failures preserve typed request context', () async {
     final client = QdrantClient(baseUrl: baseUrl);
     addTearDown(() => client.close(force: true));

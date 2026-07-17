@@ -48,6 +48,7 @@ by the compatibility harness.
 
 The SDK supports HTTP/HTTPS client configuration, API-key authentication,
 request timeouts, typed failure reporting, and collection lifecycle operations
+including atomic alias creation, deletion, and renaming,
 plus point upsert, retrieval, ID- or filter-based deletion, exact or
 approximate counts, ID-ordered scrolling, and dense- or sparse-vector queries
 with match/range payload filters, nested Boolean groups, and point-ID
@@ -152,6 +153,16 @@ try {
     Filter(must: [FieldCondition.range('year', gte: 2000)]),
   );
   await client.points.delete('movies', [1]);
+  await client.aliases.update([
+    CollectionAliasAction.create(
+      collectionName: 'movies',
+      aliasName: 'current_movies',
+    ),
+  ]);
+  print((await client.aliases.list(collectionName: 'movies')).single.aliasName);
+  await client.aliases.update([
+    CollectionAliasAction.delete('current_movies'),
+  ]);
   await client.payloadIndexes.delete('movies', 'year');
   final movies = await client.collections.get('movies');
   print(movies.pointsCount);
