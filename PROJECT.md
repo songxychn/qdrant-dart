@@ -37,8 +37,8 @@ request context needed for debugging without exposing API keys.
 
 ## Delivery sequence
 
-Milestones 0 through 2 are complete through v0.2.0. The next releases favor
-production data management before advanced hybrid-query features.
+Milestones 0 through 3 are complete through v0.3.0. The next release adds
+advanced hybrid-query features on top of the production data lifecycle.
 
 ### Milestone 0: foundation (complete)
 
@@ -66,7 +66,7 @@ production data management before advanced hybrid-query features.
 - Exercise typed server failures against both the minimum supported and current
   target Qdrant versions in CI.
 
-### Milestone 3: production data lifecycle (v0.3.0)
+### Milestone 3: production data lifecycle (complete for v0.3.0)
 
 - Set, overwrite, delete, and clear payload data.
 - Update and delete vectors without replacing entire points.

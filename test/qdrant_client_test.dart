@@ -185,6 +185,14 @@ void main() {
         throwsArgumentError,
       );
       await expectLater(
+        client.points.upsertInBatches('movies', []),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.upsertInBatches('movies', [point], batchSize: 0),
+        throwsArgumentError,
+      );
+      await expectLater(
         client.points.retrieve('', [1]),
         throwsArgumentError,
       );
@@ -202,6 +210,91 @@ void main() {
       );
       await expectLater(
         client.points.delete('movies', []),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.deleteByFilter(
+          '',
+          Filter(must: [
+            HasIdCondition([1])
+          ]),
+        ),
+        throwsArgumentError,
+      );
+      expect(() => PointSelector.ids([]), throwsArgumentError);
+      expect(() => PointSelector.ids([true]), throwsArgumentError);
+      await expectLater(
+        client.points.setPayload('', {}, PointSelector.ids([1])),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.overwritePayload('', {}, PointSelector.ids([1])),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.deletePayload(
+          'movies',
+          [],
+          PointSelector.ids([1]),
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.deletePayload(
+          'movies',
+          [''],
+          PointSelector.ids([1]),
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.clearPayload('', PointSelector.ids([1])),
+        throwsArgumentError,
+      );
+      expect(
+        () => PointVectorUpdate(id: true, vector: [0.1]),
+        throwsArgumentError,
+      );
+      expect(
+        () => PointVectorUpdate.named(id: 1, vectors: const {}),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.updateVectors('movies', []),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.updateVectors('', [
+          PointVectorUpdate(id: 1, vector: [0.1]),
+        ]),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.deleteVectors(
+          'movies',
+          [],
+          PointSelector.ids([1]),
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.deleteVectors(
+          'movies',
+          ['', 'image'],
+          PointSelector.ids([1]),
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.deleteVectors(
+          'movies',
+          ['image', 'image'],
+          PointSelector.ids([1]),
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.count(''),
         throwsArgumentError,
       );
       await expectLater(

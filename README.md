@@ -2,9 +2,9 @@
 
 An idiomatic, REST-first Dart SDK for [Qdrant](https://qdrant.tech/).
 
-> **Status:** v0.2.0 is release-ready for collection lifecycle, core point
-> operations, named dense and sparse vectors, extensible filters, and payload
-> indexes.
+> **Status:** v0.3.0 is release-ready for collection lifecycle, typed search,
+> payload and vector maintenance, filtered deletion and counts, and bounded
+> batch ingestion.
 
 ## Why this exists
 
@@ -48,13 +48,18 @@ by the compatibility harness.
 
 The SDK supports HTTP/HTTPS client configuration, API-key authentication,
 request timeouts, typed failure reporting, and collection lifecycle operations
-plus point upsert, retrieval, ID-based deletion, ID-ordered scrolling, and
-dense-vector queries with match/range payload filters, nested Boolean groups,
-and point-ID conditions against `qdrant/qdrant:v1.18.2`. Collection creation
-and point operations support one default dense vector or named dense and sparse
-vectors, and payload indexes can be created, inspected, and deleted.
-Sparse-vector configuration currently uses Qdrant's defaults; nested payload
-filters and collection tuning are not yet supported.
+plus point upsert, retrieval, ID- or filter-based deletion, exact or approximate
+counts, ID-ordered scrolling, and dense-vector queries with match/range payload
+filters, nested Boolean groups, and point-ID conditions against
+`qdrant/qdrant:v1.18.2`. Payload data can be set, overwritten, partially
+deleted, or cleared by point IDs or filters.
+Collection creation and point operations support one default dense vector or
+named dense and sparse vectors, and payload indexes can be created, inspected,
+and deleted. Selected vectors can be updated or named vectors deleted without
+replacing the rest of a point. Sparse-vector configuration currently uses
+Qdrant's defaults; nested payload filters and collection tuning are not yet
+supported. Large point iterables can be upserted in bounded sequential batches
+without hiding any per-batch update result.
 
 ## Client setup
 
@@ -90,6 +95,11 @@ try {
       vector: [0.9, 0.1, 0.1, 0.2],
       payload: {'title': 'The Matrix', 'year': 1999},
     ),
+    Point(
+      id: 2,
+      vector: [0.1, 0.9, 0.2, 0.1],
+      payload: {'title': 'The Matrix Reloaded', 'year': 2003},
+    ),
   ]);
   print(update.status);
   final stored = await client.points.retrieve(
@@ -113,6 +123,32 @@ try {
     withPayload: true,
   );
   print(matches.single.score);
+  await client.points.setPayload(
+    'movies',
+    {'featured': true},
+    PointSelector.ids([1]),
+  );
+  await client.points.overwritePayload(
+    'movies',
+    {'title': 'The Matrix', 'year': 1999},
+    PointSelector.ids([1]),
+  );
+  await client.points.deletePayload(
+    'movies',
+    ['year'],
+    PointSelector.ids([1]),
+  );
+  await client.points.clearPayload(
+    'movies',
+    PointSelector.filter(
+      Filter(must: [FieldCondition.match('title', 'The Matrix')]),
+    ),
+  );
+  print(await client.points.count('movies'));
+  await client.points.deleteByFilter(
+    'movies',
+    Filter(must: [FieldCondition.range('year', gte: 2000)]),
+  );
   await client.points.delete('movies', [1]);
   await client.payloadIndexes.delete('movies', 'year');
   final movies = await client.collections.get('movies');
@@ -144,13 +180,40 @@ await client.points.upsert('documents', [
     },
   ),
 ]);
+await client.points.updateVectors('documents', [
+  PointVectorUpdate.named(
+    id: 1,
+    vectors: {'text': DenseVector([0.8, 0.2, 0.1, 0.3])},
+  ),
+]);
 final sparseMatches = await client.points.query(
   'documents',
   SparseVector(indices: [1, 5], values: [0.8, 0.4]),
   using: 'keywords',
   withVectors: VectorSelector.named(['text']),
 );
+await client.points.deleteVectors(
+  'documents',
+  ['keywords'],
+  PointSelector.ids([1]),
+);
 ```
+
+For larger inputs, bound each request without first copying the entire iterable:
+
+```dart
+final updates = await client.points.upsertInBatches(
+  'documents',
+  generatedPoints,
+  batchSize: 100,
+);
+for (final update in updates) {
+  print(update.status);
+}
+```
+
+Batches are sent sequentially. If one request fails, Qdrant does not roll back
+earlier successful batches.
 
 When an operation fails, catch [QdrantException]. It includes the HTTP status
 when Qdrant responded, its error message when available, and the request method

@@ -180,6 +180,192 @@ void main() {
     expect(await client.collections.delete(collectionName), isTrue);
   }, tags: 'integration');
 
+  test('bounded batch upserts preserve every result', () async {
+    const collectionName = 'qdrant_dart_batch_upsert';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: CollectionVectors.dense(
+          DenseVectorParams(size: 2, distance: Distance.dot),
+        ),
+      ),
+      isTrue,
+    );
+
+    final updates = await client.points.upsertInBatches(
+      collectionName,
+      List.generate(
+        5,
+        (index) => Point(
+          id: index + 1,
+          vector: [index + 1, 1],
+          payload: {'batch_index': index},
+        ),
+      ),
+      batchSize: 2,
+    );
+    expect(updates, hasLength(3));
+    expect(
+      updates.map((update) => update.status),
+      everyElement(UpdateStatus.completed),
+    );
+    expect(await client.points.count(collectionName), 5);
+    expect(
+      (await client.points.retrieve(collectionName, [1, 2, 3, 4, 5]))
+          .map((point) => point.payload?['batch_index']),
+      [0, 1, 2, 3, 4],
+    );
+
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
+
+  test('payload data lifecycle works against the pinned image', () async {
+    const collectionName = 'qdrant_dart_payload_data';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: CollectionVectors.dense(
+          DenseVectorParams(size: 2, distance: Distance.dot),
+        ),
+      ),
+      isTrue,
+    );
+    await client.points.upsert(collectionName, [
+      Point(
+        id: 1,
+        vector: [1, 0],
+        payload: {'group': 'red', 'keep': 'yes', 'drop': 'first'},
+      ),
+      Point(
+        id: 2,
+        vector: [0, 1],
+        payload: {'group': 'blue', 'keep': 'yes', 'drop': 'second'},
+      ),
+    ]);
+
+    final setById = await client.points.setPayload(
+      collectionName,
+      {'added': 1, 'keep': 'changed'},
+      PointSelector.ids([1]),
+    );
+    expect(setById.status, UpdateStatus.completed);
+    expect(
+      (await client.points.retrieve(collectionName, [1])).single.payload,
+      {
+        'group': 'red',
+        'keep': 'changed',
+        'drop': 'first',
+        'added': 1,
+      },
+    );
+
+    final blueFilter = Filter(
+      must: [FieldCondition.match('group', 'blue')],
+    );
+    final setByFilter = await client.points.setPayload(
+      collectionName,
+      {'filtered': true},
+      PointSelector.filter(blueFilter),
+    );
+    expect(setByFilter.status, UpdateStatus.completed);
+    expect(
+      (await client.points.retrieve(collectionName, [2]))
+          .single
+          .payload?['filtered'],
+      isTrue,
+    );
+
+    final overwrite = await client.points.overwritePayload(
+      collectionName,
+      {'only': 'replacement', 'drop': 'remove-me'},
+      PointSelector.ids([1]),
+    );
+    expect(overwrite.status, UpdateStatus.completed);
+    expect(
+      (await client.points.retrieve(collectionName, [1])).single.payload,
+      {'only': 'replacement', 'drop': 'remove-me'},
+    );
+
+    final deletion = await client.points.deletePayload(
+      collectionName,
+      ['drop'],
+      PointSelector.ids([1]),
+    );
+    expect(deletion.status, UpdateStatus.completed);
+    expect(
+      (await client.points.retrieve(collectionName, [1])).single.payload,
+      {'only': 'replacement'},
+    );
+
+    final clear = await client.points.clearPayload(
+      collectionName,
+      PointSelector.filter(blueFilter),
+    );
+    expect(clear.status, UpdateStatus.completed);
+    expect(
+      (await client.points.retrieve(collectionName, [2])).single.payload,
+      isEmpty,
+    );
+
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
+
+  test('filtered deletion and counts work against the pinned image', () async {
+    const collectionName = 'qdrant_dart_count_delete';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: CollectionVectors.dense(
+          DenseVectorParams(size: 2, distance: Distance.dot),
+        ),
+      ),
+      isTrue,
+    );
+    await client.points.upsert(collectionName, [
+      Point(id: 1, vector: [1, 0], payload: {'group': 'red'}),
+      Point(id: 2, vector: [0, 1], payload: {'group': 'red'}),
+      Point(id: 3, vector: [1, 1], payload: {'group': 'blue'}),
+      Point(id: 4, vector: [0.5, 0.5], payload: {'group': 'blue'}),
+    ]);
+
+    final redFilter = Filter(
+      must: [FieldCondition.match('group', 'red')],
+    );
+    expect(await client.points.count(collectionName), 4);
+    expect(
+      await client.points.count(collectionName, filter: redFilter),
+      2,
+    );
+    expect(
+      await client.points.count(collectionName, exact: false),
+      greaterThanOrEqualTo(0),
+    );
+
+    final deletion = await client.points.deleteByFilter(
+      collectionName,
+      redFilter,
+    );
+    expect(deletion.status, UpdateStatus.completed);
+    expect(await client.points.count(collectionName), 2);
+    expect(await client.points.retrieve(collectionName, [1, 2]), isEmpty);
+    expect(
+      (await client.points.retrieve(collectionName, [3, 4]))
+          .map((point) => point.id),
+      [3, 4],
+    );
+
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
+
   test('point scrolling paginates against the pinned image', () async {
     const collectionName = 'qdrant_dart_scroll';
     final client = QdrantClient(baseUrl: baseUrl);
@@ -306,6 +492,89 @@ void main() {
       using: 'keywords',
     );
     expect(sparseMatches.first.id, 1);
+
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
+
+  test('vector updates and deletion work against the pinned image', () async {
+    const collectionName = 'qdrant_dart_vector_updates';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: CollectionVectors.named(
+          dense: {
+            'image': DenseVectorParams(size: 2, distance: Distance.dot),
+            'text': DenseVectorParams(size: 2, distance: Distance.dot),
+          },
+          sparse: const {'keywords': SparseVectorParams()},
+        ),
+      ),
+      isTrue,
+    );
+    await client.points.upsert(collectionName, [
+      Point.named(
+        id: 1,
+        vectors: {
+          'image': DenseVector([1, 0]),
+          'text': DenseVector([0, 1]),
+          'keywords': SparseVector(indices: [1], values: [1]),
+        },
+        payload: {'group': 'red'},
+      ),
+      Point.named(
+        id: 2,
+        vectors: {
+          'image': DenseVector([0, 1]),
+          'text': DenseVector([1, 0]),
+          'keywords': SparseVector(indices: [2], values: [1]),
+        },
+        payload: {'group': 'blue'},
+      ),
+    ]);
+
+    final update = await client.points.updateVectors(collectionName, [
+      PointVectorUpdate.named(
+        id: 1,
+        vectors: {
+          'image': DenseVector([0.5, 0.5]),
+          'keywords': SparseVector(indices: [3], values: [0.75]),
+        },
+      ),
+    ]);
+    expect(update.status, UpdateStatus.completed);
+    final updated = (await client.points.retrieve(
+      collectionName,
+      [1],
+      withVectors: const VectorSelector.all(),
+    ))
+        .single;
+    expect(updated.payload, {'group': 'red'});
+    expect((updated.vectors?.named['image'] as DenseVector).values, [0.5, 0.5]);
+    expect((updated.vectors?.named['text'] as DenseVector).values, [0.0, 1.0]);
+    final sparse = updated.vectors?.named['keywords'] as SparseVector;
+    expect(sparse.indices, [3]);
+    expect(sparse.values, [0.75]);
+
+    final deletion = await client.points.deleteVectors(
+      collectionName,
+      ['image'],
+      PointSelector.filter(
+        Filter(must: [FieldCondition.match('group', 'red')]),
+      ),
+    );
+    expect(deletion.status, UpdateStatus.completed);
+    final afterDeletion = (await client.points.retrieve(
+      collectionName,
+      [1, 2],
+      withVectors: const VectorSelector.all(),
+    ));
+    expect(afterDeletion.first.vectors?.named, isNot(contains('image')));
+    expect(afterDeletion.first.vectors?.named, contains('text'));
+    expect(afterDeletion.first.vectors?.named, contains('keywords'));
+    expect(afterDeletion.last.vectors?.named, contains('image'));
 
     expect(await client.collections.delete(collectionName), isTrue);
   }, tags: 'integration');

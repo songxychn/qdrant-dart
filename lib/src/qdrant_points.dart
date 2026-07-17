@@ -281,6 +281,33 @@ final class Filter extends FilterCondition {
       };
 }
 
+/// Selects points by ID or by a Qdrant [Filter].
+final class PointSelector {
+  /// Selects the provided point [ids].
+  PointSelector.ids(Iterable<Object> ids)
+      : ids = List.unmodifiable(ids.map(Point._validatePointId)),
+        filter = null {
+    if (this.ids!.isEmpty) {
+      throw ArgumentError.value(ids, 'ids', 'must not be empty.');
+    }
+  }
+
+  /// Selects every point matching [filter].
+  PointSelector.filter(this.filter) : ids = null;
+
+  /// Selected point IDs, or `null` when a filter is used.
+  final List<Object>? ids;
+
+  /// The selected point filter, or `null` when IDs are used.
+  final Filter? filter;
+
+  Map<String, Object> _toJson() => switch ((ids, filter)) {
+        (final ids?, _) => {'points': ids},
+        (_, final filter?) => {'filter': filter._toJson()},
+        _ => throw StateError('Point selector has no IDs or filter.'),
+      };
+}
+
 /// A point and similarity score returned by a dense-vector query.
 final class ScoredPoint {
   ScoredPoint._({
@@ -353,6 +380,38 @@ final class PointOperations {
     return _updateResult(response);
   }
 
+  /// Upserts [points] sequentially in bounded batches.
+  ///
+  /// Every batch result is returned in request order. If a later request
+  /// fails, earlier batches remain applied by Qdrant.
+  Future<List<UpdateResult>> upsertInBatches(
+    String collectionName,
+    Iterable<Point> points, {
+    int batchSize = 100,
+    bool wait = true,
+  }) async {
+    if (batchSize <= 0) {
+      throw ArgumentError.value(batchSize, 'batchSize', 'must be positive.');
+    }
+
+    final results = <UpdateResult>[];
+    var batch = <Point>[];
+    for (final point in points) {
+      batch.add(point);
+      if (batch.length == batchSize) {
+        results.add(await upsert(collectionName, batch, wait: wait));
+        batch = <Point>[];
+      }
+    }
+    if (batch.isNotEmpty) {
+      results.add(await upsert(collectionName, batch, wait: wait));
+    }
+    if (results.isEmpty) {
+      throw ArgumentError.value(points, 'points', 'must not be empty.');
+    }
+    return List.unmodifiable(results);
+  }
+
   /// Retrieves existing points matching [ids] from [collectionName].
   ///
   /// Payloads are returned by default. Use [withVectors] to request vectors.
@@ -392,12 +451,213 @@ final class PointOperations {
       method: 'POST',
       path: _pointsPath(
         collectionName,
-        operation: 'delete',
+        operations: const ['delete'],
         queryParameters: {'wait': wait.toString()},
       ),
       body: {'points': _pointIds(ids)},
     );
     return _updateResult(response);
+  }
+
+  /// Deletes points matching [filter] from [collectionName].
+  ///
+  /// When [wait] is true, Qdrant waits until the deletion has been applied.
+  Future<UpdateResult> deleteByFilter(
+    String collectionName,
+    Filter filter, {
+    bool wait = true,
+  }) async {
+    final response = await _transport.send(
+      method: 'POST',
+      path: _pointsPath(
+        collectionName,
+        operations: const ['delete'],
+        queryParameters: {'wait': wait.toString()},
+      ),
+      body: {'filter': filter._toJson()},
+    );
+    return _updateResult(response);
+  }
+
+  /// Merges [payload] into points matching [selector].
+  ///
+  /// When [wait] is true, Qdrant waits until the update has been applied.
+  Future<UpdateResult> setPayload(
+    String collectionName,
+    Map<String, Object?> payload,
+    PointSelector selector, {
+    bool wait = true,
+  }) async {
+    final response = await _transport.send(
+      method: 'POST',
+      path: _pointsPath(
+        collectionName,
+        operations: const ['payload'],
+        queryParameters: {'wait': wait.toString()},
+      ),
+      body: {
+        'payload': Map<String, Object?>.unmodifiable(payload),
+        ...selector._toJson(),
+      },
+    );
+    return _updateResult(response);
+  }
+
+  /// Replaces the payload of points matching [selector] with [payload].
+  ///
+  /// When [wait] is true, Qdrant waits until the update has been applied.
+  Future<UpdateResult> overwritePayload(
+    String collectionName,
+    Map<String, Object?> payload,
+    PointSelector selector, {
+    bool wait = true,
+  }) async {
+    final response = await _transport.send(
+      method: 'PUT',
+      path: _pointsPath(
+        collectionName,
+        operations: const ['payload'],
+        queryParameters: {'wait': wait.toString()},
+      ),
+      body: {
+        'payload': Map<String, Object?>.unmodifiable(payload),
+        ...selector._toJson(),
+      },
+    );
+    return _updateResult(response);
+  }
+
+  /// Deletes the payload [keys] from points matching [selector].
+  ///
+  /// When [wait] is true, Qdrant waits until the update has been applied.
+  Future<UpdateResult> deletePayload(
+    String collectionName,
+    Iterable<String> keys,
+    PointSelector selector, {
+    bool wait = true,
+  }) async {
+    final keyList = keys.toList(growable: false);
+    if (keyList.isEmpty || keyList.any((key) => key.isEmpty)) {
+      throw ArgumentError.value(
+        keys,
+        'keys',
+        'must contain at least one non-empty key.',
+      );
+    }
+    final response = await _transport.send(
+      method: 'POST',
+      path: _pointsPath(
+        collectionName,
+        operations: const ['payload', 'delete'],
+        queryParameters: {'wait': wait.toString()},
+      ),
+      body: {'keys': keyList, ...selector._toJson()},
+    );
+    return _updateResult(response);
+  }
+
+  /// Clears all payload data from points matching [selector].
+  ///
+  /// When [wait] is true, Qdrant waits until the update has been applied.
+  Future<UpdateResult> clearPayload(
+    String collectionName,
+    PointSelector selector, {
+    bool wait = true,
+  }) async {
+    final response = await _transport.send(
+      method: 'POST',
+      path: _pointsPath(
+        collectionName,
+        operations: const ['payload', 'clear'],
+        queryParameters: {'wait': wait.toString()},
+      ),
+      body: selector._toJson(),
+    );
+    return _updateResult(response);
+  }
+
+  /// Updates selected vectors without replacing each point's other data.
+  ///
+  /// When [wait] is true, Qdrant waits until the update has been applied.
+  Future<UpdateResult> updateVectors(
+    String collectionName,
+    Iterable<PointVectorUpdate> updates, {
+    bool wait = true,
+  }) async {
+    final updateList = updates.toList(growable: false);
+    if (updateList.isEmpty) {
+      throw ArgumentError.value(updates, 'updates', 'must not be empty.');
+    }
+    final response = await _transport.send(
+      method: 'PUT',
+      path: _pointsPath(
+        collectionName,
+        operations: const ['vectors'],
+        queryParameters: {'wait': wait.toString()},
+      ),
+      body: {
+        'points': updateList.map((update) => update._toJson()).toList(),
+      },
+    );
+    return _updateResult(response);
+  }
+
+  /// Deletes named [vectors] from points matching [selector].
+  ///
+  /// When [wait] is true, Qdrant waits until the deletion has been applied.
+  Future<UpdateResult> deleteVectors(
+    String collectionName,
+    Iterable<String> vectors,
+    PointSelector selector, {
+    bool wait = true,
+  }) async {
+    final vectorList = vectors.toList(growable: false);
+    if (vectorList.isEmpty) {
+      throw ArgumentError.value(vectors, 'vectors', 'must not be empty.');
+    }
+    for (final vector in vectorList) {
+      _validateVectorName(vector, 'vectors');
+    }
+    if (vectorList.toSet().length != vectorList.length) {
+      throw ArgumentError.value(
+        vectors,
+        'vectors',
+        'must not contain duplicates.',
+      );
+    }
+    final response = await _transport.send(
+      method: 'POST',
+      path: _pointsPath(
+        collectionName,
+        operations: const ['vectors', 'delete'],
+        queryParameters: {'wait': wait.toString()},
+      ),
+      body: {'vectors': vectorList, ...selector._toJson()},
+    );
+    return _updateResult(response);
+  }
+
+  /// Counts points in [collectionName], optionally limited by [filter].
+  ///
+  /// An [exact] count is more reliable while indexing is in progress.
+  Future<int> count(
+    String collectionName, {
+    Filter? filter,
+    bool exact = true,
+  }) async {
+    final response = await _transport.send(
+      method: 'POST',
+      path: _pointsPath(collectionName, operations: const ['count']),
+      body: {
+        if (filter != null) 'filter': filter._toJson(),
+        'exact': exact,
+      },
+    );
+    final count = _jsonObject(_result(response), 'count result')['count'];
+    if (count is! int || count < 0) {
+      throw FormatException('Qdrant response has no non-negative count.');
+    }
+    return count;
   }
 
   /// Returns one ID-ordered page of points from [collectionName].
@@ -414,7 +674,7 @@ final class PointOperations {
     }
     final response = await _transport.send(
       method: 'POST',
-      path: _pointsPath(collectionName, operation: 'scroll'),
+      path: _pointsPath(collectionName, operations: const ['scroll']),
       body: {
         if (offset != null) 'offset': Point._validatePointId(offset),
         'limit': limit,
@@ -492,7 +752,7 @@ final class PointOperations {
     }
     final response = await _transport.send(
       method: 'POST',
-      path: _pointsPath(collectionName, operation: 'query'),
+      path: _pointsPath(collectionName, operations: const ['query']),
       body: {
         'query': vector._toJson(),
         if (using != null) 'using': using,
@@ -514,7 +774,7 @@ final class PointOperations {
 
   Uri _pointsPath(
     String collectionName, {
-    String? operation,
+    List<String> operations = const [],
     Map<String, String>? queryParameters,
   }) {
     if (collectionName.isEmpty) {
@@ -529,7 +789,7 @@ final class PointOperations {
         'collections',
         collectionName,
         'points',
-        if (operation != null) operation,
+        ...operations,
       ],
       queryParameters: queryParameters,
     );

@@ -24,12 +24,24 @@ Future<void> main() async {
       'year',
       schema: PayloadSchemaType.integer,
     );
-    await client.points.upsert(collectionName, [
-      Point(
-        id: 1,
-        vector: [0.9, 0.1, 0.1, 0.2],
-        payload: {'title': 'The Matrix', 'year': 1999},
-      ),
+    await client.points.upsertInBatches(
+      collectionName,
+      [
+        Point(
+          id: 1,
+          vector: [0.9, 0.1, 0.1, 0.2],
+          payload: {'title': 'The Matrix', 'year': 1999},
+        ),
+      ],
+      batchSize: 100,
+    );
+    await client.points.setPayload(
+      collectionName,
+      {'featured': true},
+      PointSelector.ids([1]),
+    );
+    await client.points.updateVectors(collectionName, [
+      PointVectorUpdate(id: 1, vector: [0.8, 0.2, 0.1, 0.2]),
     ]);
 
     final matches = await client.points.query(
@@ -41,6 +53,7 @@ Future<void> main() async {
       withPayload: true,
     );
     print(matches.single.payload?['title']);
+    print(await client.points.count(collectionName));
   } finally {
     try {
       if (created) {
