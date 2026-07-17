@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.5.0 - 2026-07-17
+
+- Added atomic collection-alias creation, deletion, renaming, global listing,
+  and per-collection listing for production collection cutovers.
+- Added runtime optimizer indexing-threshold updates and exposed the current
+  threshold in collection details for controlled bulk ingestion.
+- Added a manual Qdrant Cloud smoke workflow that uses the same public client
+  API as self-hosted Qdrant and cleans up its temporary collection and alias.
+- Added real-server coverage for aliases and collection tuning against the
+  minimum supported `qdrant/qdrant:v1.12.0` and target
+  `qdrant/qdrant:v1.18.2` images.
+
+This release completes the production-operations milestone. The Cloud smoke
+flow was verified against the target Docker image; running it against Qdrant
+Cloud requires `QDRANT_URL` and `QDRANT_API_KEY` secrets in the documented
+GitHub Environment. Snapshots, shard administration, cluster management, and
+broader collection tuning remain deferred until real deployments require them.
+
 ## 0.4.0 - 2026-07-17
 
 - Added typed vector prefetches with named-vector selection, payload filters,

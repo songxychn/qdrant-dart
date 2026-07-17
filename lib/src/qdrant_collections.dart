@@ -11,6 +11,7 @@ final class CollectionInfo {
     required this.pointsCount,
     required this.indexedVectorsCount,
     required this.segmentsCount,
+    required this.indexingThreshold,
   });
 
   /// The collection name used for the request.
@@ -33,6 +34,9 @@ final class CollectionInfo {
 
   /// The current number of Qdrant segments in the collection.
   final int segmentsCount;
+
+  /// The optimizer size threshold in kilobytes before vectors are indexed.
+  final int indexingThreshold;
 }
 
 /// Collection lifecycle operations for a [QdrantClient].
@@ -60,6 +64,10 @@ final class CollectionOperations {
     final result = _objectResult(response);
     final config = _jsonObject(result['config'], 'result.config');
     final params = _jsonObject(config['params'], 'result.config.params');
+    final optimizerConfig = _jsonObject(
+      config['optimizer_config'],
+      'result.config.optimizer_config',
+    );
     return CollectionInfo(
       name: name,
       status: _string(result['status'], 'result.status'),
@@ -85,6 +93,10 @@ final class CollectionOperations {
       ),
       segmentsCount:
           _integer(result['segments_count'], 'result.segments_count'),
+      indexingThreshold: _integer(
+        optimizerConfig['indexing_threshold'],
+        'result.config.optimizer_config.indexing_threshold',
+      ),
     );
   }
 
@@ -104,6 +116,31 @@ final class CollectionOperations {
               'result.collections.name',
             ))
         .toList(growable: false);
+  }
+
+  /// Changes the optimizer indexing threshold for [name].
+  ///
+  /// Set [indexingThreshold] to zero to disable vector indexing during a bulk
+  /// load, then restore a positive threshold after ingestion.
+  Future<bool> updateIndexingThreshold(
+    String name,
+    int indexingThreshold,
+  ) async {
+    if (indexingThreshold < 0) {
+      throw ArgumentError.value(
+        indexingThreshold,
+        'indexingThreshold',
+        'must not be negative.',
+      );
+    }
+    final response = await _transport.send(
+      method: 'PATCH',
+      path: _collectionPath(name),
+      body: {
+        'optimizers_config': {'indexing_threshold': indexingThreshold},
+      },
+    );
+    return _booleanResult(response);
   }
 
   /// Deletes [name] and all of its points.

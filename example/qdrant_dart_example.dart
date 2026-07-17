@@ -19,11 +19,23 @@ Future<void> main() async {
         DenseVectorParams(size: 4, distance: Distance.cosine),
       ),
     );
+    await client.aliases.update([
+      CollectionAliasAction.create(
+        collectionName: collectionName,
+        aliasName: '${collectionName}_current',
+      ),
+    ]);
+    print(
+      (await client.aliases.list(collectionName: collectionName))
+          .single
+          .aliasName,
+    );
     await client.payloadIndexes.create(
       collectionName,
       'year',
       schema: PayloadSchemaType.integer,
     );
+    await client.collections.updateIndexingThreshold(collectionName, 0);
     await client.points.upsertInBatches(
       collectionName,
       [
@@ -35,6 +47,7 @@ Future<void> main() async {
       ],
       batchSize: 100,
     );
+    await client.collections.updateIndexingThreshold(collectionName, 20000);
     await client.points.setPayload(
       collectionName,
       {'featured': true},
@@ -57,6 +70,9 @@ Future<void> main() async {
   } finally {
     try {
       if (created) {
+        await client.aliases.update([
+          CollectionAliasAction.delete('${collectionName}_current'),
+        ]);
         await client.collections.delete(collectionName);
       }
     } finally {

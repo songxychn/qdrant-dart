@@ -37,8 +37,8 @@ request context needed for debugging without exposing API keys.
 
 ## Delivery sequence
 
-Milestones 0 through 4 are complete through v0.4.0. The next release focuses on
-the narrow production operations requested by real deployments.
+Milestones 0 through 5 are complete through v0.5.0. The next release focuses on
+stabilizing the supported API for v1.0.0.
 
 ### Milestone 0: foundation (complete)
 
@@ -79,7 +79,7 @@ the narrow production operations requested by real deployments.
 - Add prefetch and reciprocal-rank or distribution-based score fusion.
 - Cover one complete dense-plus-sparse hybrid-search flow against Qdrant.
 
-### Milestone 5: production operations (v0.5.0)
+### Milestone 5: production operations (complete for v0.5.0)
 
 - Add collection aliases and only the collection tuning requested by real
   deployments.

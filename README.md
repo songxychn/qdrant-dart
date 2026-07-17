@@ -2,9 +2,9 @@
 
 An idiomatic, REST-first Dart SDK for [Qdrant](https://qdrant.tech/).
 
-> **Status:** v0.4.0 is release-ready for collection lifecycle, production data
-> maintenance, and named dense/sparse search with multi-stage prefetch and RRF
-> fusion.
+> **Status:** v0.5.0 is release-ready for collection lifecycle, production data
+> maintenance, atomic collection aliases, bounded indexing-threshold tuning,
+> and named dense/sparse search with multi-stage prefetch and RRF fusion.
 
 ## Why this exists
 
@@ -48,6 +48,7 @@ by the compatibility harness.
 
 The SDK supports HTTP/HTTPS client configuration, API-key authentication,
 request timeouts, typed failure reporting, and collection lifecycle operations
+including atomic alias creation, deletion, and renaming,
 plus point upsert, retrieval, ID- or filter-based deletion, exact or
 approximate counts, ID-ordered scrolling, and dense- or sparse-vector queries
 with match/range payload filters, nested Boolean groups, and point-ID
@@ -57,9 +58,10 @@ Collection creation and point operations support one default dense vector or
 named dense and sparse vectors, and payload indexes can be created, inspected,
 and deleted. Selected vectors can be updated or named vectors deleted without
 replacing the rest of a point. Sparse-vector configuration currently uses
-Qdrant's defaults; nested payload filters and collection tuning are not yet
-supported. Large point iterables can be upserted in bounded sequential batches
-without hiding any per-batch update result. Query prefetches can select
+Qdrant's defaults; nested payload filters and collection tuning beyond the
+optimizer indexing threshold are not yet supported. Large point iterables can
+be upserted in bounded sequential batches without hiding any per-batch update
+result. Query prefetches can select
 candidates with one vector before the main vector reranks them, or combine
 dense and sparse rankings with Reciprocal Rank Fusion (RRF).
 
@@ -91,6 +93,7 @@ try {
     'year',
     schema: PayloadSchemaType.integer,
   );
+  await client.collections.updateIndexingThreshold('movies', 0);
   final update = await client.points.upsert('movies', [
     Point(
       id: 1,
@@ -103,6 +106,7 @@ try {
       payload: {'title': 'The Matrix Reloaded', 'year': 2003},
     ),
   ]);
+  await client.collections.updateIndexingThreshold('movies', 20000);
   print(update.status);
   final stored = await client.points.retrieve(
     'movies',
@@ -152,6 +156,16 @@ try {
     Filter(must: [FieldCondition.range('year', gte: 2000)]),
   );
   await client.points.delete('movies', [1]);
+  await client.aliases.update([
+    CollectionAliasAction.create(
+      collectionName: 'movies',
+      aliasName: 'current_movies',
+    ),
+  ]);
+  print((await client.aliases.list(collectionName: 'movies')).single.aliasName);
+  await client.aliases.update([
+    CollectionAliasAction.delete('current_movies'),
+  ]);
   await client.payloadIndexes.delete('movies', 'year');
   final movies = await client.collections.get('movies');
   print(movies.pointsCount);
@@ -264,6 +278,26 @@ dart test --exclude-tags integration
 The compatibility script runs the real-server integration suite against both
 declared Qdrant versions. Each image starts on a random localhost port and is
 removed after its tests finish.
+
+### Qdrant Cloud smoke test
+
+The manual `Qdrant Cloud smoke test` workflow uses the same public client API
+as a self-hosted server. Configure its `qdrant-cloud` GitHub Environment with
+`QDRANT_URL` and `QDRANT_API_KEY` secrets, then trigger the workflow. The test
+creates a uniquely named collection and alias, exercises tuning, write, and
+query operations, and deletes the temporary resources even when an assertion
+fails.
+
+Run the same smoke test locally with trusted server-side credentials:
+
+```sh
+QDRANT_URL=https://your-cluster.example \
+QDRANT_API_KEY=... \
+./tool/test-cloud-smoke.sh
+```
+
+Do not expose either value in Flutter or browser code, logs, or repository
+configuration.
 
 ## Releasing
 

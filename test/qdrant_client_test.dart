@@ -138,6 +138,53 @@ void main() {
     });
   });
 
+  group('CollectionOperations', () {
+    test('rejects invalid indexing threshold updates', () async {
+      final client = QdrantClient(
+        baseUrl: Uri.parse('http://127.0.0.1:6333'),
+      );
+      addTearDown(client.close);
+
+      await expectLater(
+        client.collections.updateIndexingThreshold('', 0),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.collections.updateIndexingThreshold('movies', -1),
+        throwsArgumentError,
+      );
+    });
+  });
+
+  group('CollectionAliasOperations', () {
+    test('rejects empty names and action lists', () async {
+      final client = QdrantClient(
+        baseUrl: Uri.parse('http://127.0.0.1:6333'),
+      );
+      addTearDown(client.close);
+
+      expect(
+        () => CollectionAliasAction.create(
+          collectionName: '',
+          aliasName: 'current',
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => CollectionAliasAction.rename(
+          oldAliasName: 'current',
+          newAliasName: '',
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.aliases.list(collectionName: ''),
+        throwsArgumentError,
+      );
+      await expectLater(client.aliases.update([]), throwsArgumentError);
+    });
+  });
+
   group('PayloadIndexOperations', () {
     test('rejects empty collection and field names', () async {
       final client = QdrantClient(
