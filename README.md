@@ -2,9 +2,9 @@
 
 An idiomatic, REST-first Dart SDK for [Qdrant](https://qdrant.tech/).
 
-> **Status:** v0.3.0 is release-ready for collection lifecycle, typed search,
-> payload and vector maintenance, filtered deletion and counts, and bounded
-> batch ingestion.
+> **Status:** v0.4.0 is release-ready for collection lifecycle, production data
+> maintenance, and named dense/sparse search with multi-stage prefetch and RRF
+> fusion.
 
 ## Why this exists
 
@@ -48,11 +48,11 @@ by the compatibility harness.
 
 The SDK supports HTTP/HTTPS client configuration, API-key authentication,
 request timeouts, typed failure reporting, and collection lifecycle operations
-plus point upsert, retrieval, ID- or filter-based deletion, exact or approximate
-counts, ID-ordered scrolling, and dense-vector queries with match/range payload
-filters, nested Boolean groups, and point-ID conditions against
-`qdrant/qdrant:v1.18.2`. Payload data can be set, overwritten, partially
-deleted, or cleared by point IDs or filters.
+plus point upsert, retrieval, ID- or filter-based deletion, exact or
+approximate counts, ID-ordered scrolling, and dense- or sparse-vector queries
+with match/range payload filters, nested Boolean groups, and point-ID
+conditions against `qdrant/qdrant:v1.18.2`. Payload data can be set,
+overwritten, partially deleted, or cleared by point IDs or filters.
 Collection creation and point operations support one default dense vector or
 named dense and sparse vectors, and payload indexes can be created, inspected,
 and deleted. Selected vectors can be updated or named vectors deleted without

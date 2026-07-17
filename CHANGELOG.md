@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.0 - 2026-07-17
+
+- Added typed vector prefetches with named-vector selection, payload filters,
+  and bounded candidate limits for multi-stage Query API requests.
+- Added `queryRrf` to fuse named dense and sparse prefetch rankings with
+  Qdrant's default Reciprocal Rank Fusion.
+- Added a complete dense-plus-sparse hybrid-search flow against the minimum
+  supported `qdrant/qdrant:v1.12.0` and target
+  `qdrant/qdrant:v1.18.2` images.
+
+This release completes the hybrid-query milestone without changing the 0.3
+point or vector models. Configurable RRF constants and weights are intentionally
+not exposed because they require newer Qdrant versions than the declared
+minimum.
+
 ## 0.3.0 - 2026-07-17
 
 - Added payload set, overwrite, key deletion, and clear operations for point-ID
