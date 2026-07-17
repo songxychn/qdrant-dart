@@ -279,6 +279,26 @@ The compatibility script runs the real-server integration suite against both
 declared Qdrant versions. Each image starts on a random localhost port and is
 removed after its tests finish.
 
+### Qdrant Cloud smoke test
+
+The manual `Qdrant Cloud smoke test` workflow uses the same public client API
+as a self-hosted server. Configure its `qdrant-cloud` GitHub Environment with
+`QDRANT_URL` and `QDRANT_API_KEY` secrets, then trigger the workflow. The test
+creates a uniquely named collection and alias, exercises tuning, write, and
+query operations, and deletes the temporary resources even when an assertion
+fails.
+
+Run the same smoke test locally with trusted server-side credentials:
+
+```sh
+QDRANT_URL=https://your-cluster.example \
+QDRANT_API_KEY=... \
+./tool/test-cloud-smoke.sh
+```
+
+Do not expose either value in Flutter or browser code, logs, or repository
+configuration.
+
 ## Releasing
 
 Releases are tag-driven. Update `pubspec.yaml` and `CHANGELOG.md` in the same
