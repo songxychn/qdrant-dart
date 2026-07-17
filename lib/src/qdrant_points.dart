@@ -471,11 +471,13 @@ final class PointOperations {
         'with_vector': withVectors._toJson(),
       },
     );
-    final result = _result(response);
-    if (result is! List) {
-      throw FormatException('Qdrant response has no point list.');
-    }
-    return result.map(PointRecord._fromJson).toList(growable: false);
+    return response.parse(() {
+      final result = _result(response);
+      if (result is! List) {
+        throw FormatException('Qdrant response has no point list.');
+      }
+      return result.map(PointRecord._fromJson).toList(growable: false);
+    });
   }
 
   /// Deletes points matching [ids] from [collectionName].
@@ -692,11 +694,13 @@ final class PointOperations {
         'exact': exact,
       },
     );
-    final count = _jsonObject(_result(response), 'count result')['count'];
-    if (count is! int || count < 0) {
-      throw FormatException('Qdrant response has no non-negative count.');
-    }
-    return count;
+    return response.parse(() {
+      final count = _jsonObject(_result(response), 'count result')['count'];
+      if (count is! int || count < 0) {
+        throw FormatException('Qdrant response has no non-negative count.');
+      }
+      return count;
+    });
   }
 
   /// Returns one ID-ordered page of points from [collectionName].
@@ -722,18 +726,20 @@ final class PointOperations {
         'with_vector': withVectors._toJson(),
       },
     );
-    final result = _jsonObject(_result(response), 'result');
-    final points = result['points'];
-    if (points is! List) {
-      throw FormatException('Qdrant response has no scroll point list.');
-    }
-    final nextPageOffset = result['next_page_offset'];
-    return ScrollPage._(
-      points: points.map(PointRecord._fromJson).toList(growable: false),
-      nextPageOffset: nextPageOffset == null
-          ? null
-          : PointRecord._idFromJson(nextPageOffset),
-    );
+    return response.parse(() {
+      final result = _jsonObject(_result(response), 'result');
+      final points = result['points'];
+      if (points is! List) {
+        throw FormatException('Qdrant response has no scroll point list.');
+      }
+      final nextPageOffset = result['next_page_offset'];
+      return ScrollPage._(
+        points: points.map(PointRecord._fromJson).toList(growable: false),
+        nextPageOffset: nextPageOffset == null
+            ? null
+            : PointRecord._idFromJson(nextPageOffset),
+      );
+    });
   }
 
   /// Streams every point in [collectionName] using ID-based pagination.
@@ -844,12 +850,14 @@ final class PointOperations {
   }
 
   List<ScoredPoint> _queryPoints(QdrantResponse response) {
-    final result = _jsonObject(_result(response), 'result');
-    final points = result['points'];
-    if (points is! List) {
-      throw FormatException('Qdrant response has no query point list.');
-    }
-    return points.map(ScoredPoint._fromJson).toList(growable: false);
+    return response.parse(() {
+      final result = _jsonObject(_result(response), 'result');
+      final points = result['points'];
+      if (points is! List) {
+        throw FormatException('Qdrant response has no query point list.');
+      }
+      return points.map(ScoredPoint._fromJson).toList(growable: false);
+    });
   }
 
   Uri _pointsPath(
@@ -888,16 +896,18 @@ final class PointOperations {
 }
 
 UpdateResult _updateResult(QdrantResponse response) {
-  final result = _jsonObject(
-    _jsonObject(jsonDecode(response.body), 'response')['result'],
-    'result',
-  );
-  final operationId = result['operation_id'];
-  if (operationId != null && operationId is! int) {
-    throw FormatException('Qdrant response has no integer operation ID.');
-  }
-  return UpdateResult(
-    operationId: operationId as int?,
-    status: UpdateStatus._fromJson(result['status']),
-  );
+  return response.parse(() {
+    final result = _jsonObject(
+      _jsonObject(jsonDecode(response.body), 'response')['result'],
+      'result',
+    );
+    final operationId = result['operation_id'];
+    if (operationId != null && operationId is! int) {
+      throw FormatException('Qdrant response has no integer operation ID.');
+    }
+    return UpdateResult(
+      operationId: operationId as int?,
+      status: UpdateStatus._fromJson(result['status']),
+    );
+  });
 }

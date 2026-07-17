@@ -287,7 +287,9 @@ earlier successful batches.
 
 When an operation fails, catch [QdrantException]. It includes the HTTP status
 when Qdrant responded, its error message when available, and the request method
-and URL. It never includes the API key.
+and URL. Successful responses that do not match the supported Qdrant protocol
+are reported the same way, with the parsing failure in `cause`. It never
+includes the API key.
 
 ## Development
 

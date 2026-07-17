@@ -164,6 +164,34 @@ void main() {
   });
 
   group('CollectionOperations', () {
+    test('maps incompatible successful responses to QdrantException', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final client = QdrantClient(
+        baseUrl: Uri.parse('http://${server.address.address}:${server.port}'),
+      );
+      addTearDown(() async {
+        client.close(force: true);
+        await server.close(force: true);
+      });
+      server.listen((request) async {
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..write('{not-json');
+        await request.response.close();
+      });
+
+      await expectLater(
+        client.collections.list(),
+        throwsA(
+          isA<QdrantException>()
+              .having((error) => error.method, 'method', 'GET')
+              .having((error) => error.statusCode, 'statusCode', 200)
+              .having((error) => error.uri.path, 'path', '/collections')
+              .having((error) => error.cause, 'cause', isA<FormatException>()),
+        ),
+      );
+    });
+
     test('accepts collection counts omitted by Qdrant', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       final client = QdrantClient(
