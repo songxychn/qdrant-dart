@@ -58,7 +58,8 @@ named dense and sparse vectors, and payload indexes can be created, inspected,
 and deleted. Selected vectors can be updated or named vectors deleted without
 replacing the rest of a point. Sparse-vector configuration currently uses
 Qdrant's defaults; nested payload filters and collection tuning are not yet
-supported.
+supported. Large point iterables can be upserted in bounded sequential batches
+without hiding any per-batch update result.
 
 ## Client setup
 
@@ -197,6 +198,22 @@ await client.points.deleteVectors(
   PointSelector.ids([1]),
 );
 ```
+
+For larger inputs, bound each request without first copying the entire iterable:
+
+```dart
+final updates = await client.points.upsertInBatches(
+  'documents',
+  generatedPoints,
+  batchSize: 100,
+);
+for (final update in updates) {
+  print(update.status);
+}
+```
+
+Batches are sent sequentially. If one request fails, Qdrant does not roll back
+earlier successful batches.
 
 When an operation fails, catch [QdrantException]. It includes the HTTP status
 when Qdrant responded, its error message when available, and the request method

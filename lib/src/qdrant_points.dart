@@ -380,6 +380,38 @@ final class PointOperations {
     return _updateResult(response);
   }
 
+  /// Upserts [points] sequentially in bounded batches.
+  ///
+  /// Every batch result is returned in request order. If a later request
+  /// fails, earlier batches remain applied by Qdrant.
+  Future<List<UpdateResult>> upsertInBatches(
+    String collectionName,
+    Iterable<Point> points, {
+    int batchSize = 100,
+    bool wait = true,
+  }) async {
+    if (batchSize <= 0) {
+      throw ArgumentError.value(batchSize, 'batchSize', 'must be positive.');
+    }
+
+    final results = <UpdateResult>[];
+    var batch = <Point>[];
+    for (final point in points) {
+      batch.add(point);
+      if (batch.length == batchSize) {
+        results.add(await upsert(collectionName, batch, wait: wait));
+        batch = <Point>[];
+      }
+    }
+    if (batch.isNotEmpty) {
+      results.add(await upsert(collectionName, batch, wait: wait));
+    }
+    if (results.isEmpty) {
+      throw ArgumentError.value(points, 'points', 'must not be empty.');
+    }
+    return List.unmodifiable(results);
+  }
+
   /// Retrieves existing points matching [ids] from [collectionName].
   ///
   /// Payloads are returned by default. Use [withVectors] to request vectors.

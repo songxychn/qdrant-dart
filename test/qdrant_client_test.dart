@@ -185,6 +185,14 @@ void main() {
         throwsArgumentError,
       );
       await expectLater(
+        client.points.upsertInBatches('movies', []),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.upsertInBatches('movies', [point], batchSize: 0),
+        throwsArgumentError,
+      );
+      await expectLater(
         client.points.retrieve('', [1]),
         throwsArgumentError,
       );

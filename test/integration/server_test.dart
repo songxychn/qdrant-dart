@@ -180,6 +180,48 @@ void main() {
     expect(await client.collections.delete(collectionName), isTrue);
   }, tags: 'integration');
 
+  test('bounded batch upserts preserve every result', () async {
+    const collectionName = 'qdrant_dart_batch_upsert';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: CollectionVectors.dense(
+          DenseVectorParams(size: 2, distance: Distance.dot),
+        ),
+      ),
+      isTrue,
+    );
+
+    final updates = await client.points.upsertInBatches(
+      collectionName,
+      List.generate(
+        5,
+        (index) => Point(
+          id: index + 1,
+          vector: [index + 1, 1],
+          payload: {'batch_index': index},
+        ),
+      ),
+      batchSize: 2,
+    );
+    expect(updates, hasLength(3));
+    expect(
+      updates.map((update) => update.status),
+      everyElement(UpdateStatus.completed),
+    );
+    expect(await client.points.count(collectionName), 5);
+    expect(
+      (await client.points.retrieve(collectionName, [1, 2, 3, 4, 5]))
+          .map((point) => point.payload?['batch_index']),
+      [0, 1, 2, 3, 4],
+    );
+
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
+
   test('payload data lifecycle works against the pinned image', () async {
     const collectionName = 'qdrant_dart_payload_data';
     final client = QdrantClient(baseUrl: baseUrl);

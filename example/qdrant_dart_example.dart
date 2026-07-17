@@ -24,13 +24,17 @@ Future<void> main() async {
       'year',
       schema: PayloadSchemaType.integer,
     );
-    await client.points.upsert(collectionName, [
-      Point(
-        id: 1,
-        vector: [0.9, 0.1, 0.1, 0.2],
-        payload: {'title': 'The Matrix', 'year': 1999},
-      ),
-    ]);
+    await client.points.upsertInBatches(
+      collectionName,
+      [
+        Point(
+          id: 1,
+          vector: [0.9, 0.1, 0.1, 0.2],
+          payload: {'title': 'The Matrix', 'year': 1999},
+        ),
+      ],
+      batchSize: 100,
+    );
     await client.points.setPayload(
       collectionName,
       {'featured': true},
