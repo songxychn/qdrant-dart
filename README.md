@@ -2,9 +2,9 @@
 
 An idiomatic, REST-first Dart SDK for [Qdrant](https://qdrant.tech/).
 
-> **Status:** v0.5.0 is release-ready for collection lifecycle, production data
-> maintenance, atomic collection aliases, bounded indexing-threshold tuning,
-> and named dense/sparse search with multi-stage prefetch and RRF fusion.
+> **Status:** v0.6.0 is the release-ready API candidate for v1. It covers
+> collection lifecycle, production data maintenance, atomic aliases, bounded
+> indexing-threshold tuning, and dense/sparse search with prefetch and RRF.
 
 ## Why this exists
 
@@ -44,7 +44,10 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 Development is verified against a minimum supported Qdrant `v1.12.0` and the
 current target `v1.18.2`. [`tool/qdrant-min-version`](tool/qdrant-min-version)
 and [`tool/qdrant-version`](tool/qdrant-version) are the sources of truth used
-by the compatibility harness.
+by the compatibility harness. Collection point and indexed-vector counts are
+nullable because supported Qdrant versions may omit those statistics. Vector
+values and filter conditions are SDK-owned hierarchies; callers should not
+assume the currently exported subtypes are exhaustive.
 
 The SDK supports HTTP/HTTPS client configuration, API-key authentication,
 request timeouts, typed failure reporting, and collection lifecycle operations
@@ -55,11 +58,13 @@ with match/range payload filters, nested Boolean groups, and point-ID
 conditions against `qdrant/qdrant:v1.18.2`. Payload data can be set,
 overwritten, partially deleted, or cleared by point IDs or filters.
 Collection creation and point operations support one default dense vector or
-named dense and sparse vectors, and payload indexes can be created, inspected,
-and deleted. Selected vectors can be updated or named vectors deleted without
-replacing the rest of a point. Sparse-vector configuration currently uses
-Qdrant's defaults; nested payload filters and collection tuning beyond the
-optimizer indexing threshold are not yet supported. Large point iterables can
+named dense and sparse vectors. A default dense vector can also be stored with
+named sparse vectors, including an empty sparse vector. Payload indexes can be
+created, inspected, and deleted. Selected vectors can be updated or named
+vectors deleted without replacing the rest of a point. Sparse-vector
+configuration currently uses Qdrant's defaults; nested payload filters and
+collection tuning beyond the optimizer indexing threshold are not yet
+supported. Large point iterables can
 be upserted in bounded sequential batches without hiding any per-batch update
 result. Query prefetches can select
 candidates with one vector before the main vector reranks them, or combine
@@ -69,7 +74,8 @@ dense and sparse rankings with Reciprocal Rank Fusion (RRF).
 
 Use the client only in a trusted Dart service or CLI. Read API keys from the
 server-side environment rather than embedding them in a Flutter or browser
-application.
+application. Pass credentials through `apiKey`; URLs containing user info are
+rejected so credentials cannot leak through request diagnostics.
 
 ```dart
 import 'dart:io';
@@ -243,6 +249,26 @@ await client.points.deleteVectors(
 );
 ```
 
+Collections with a default dense vector can add named sparse vectors to the
+same point:
+
+```dart
+await client.collections.create(
+  'documents',
+  vectors: CollectionVectors.dense(
+    DenseVectorParams(size: 4, distance: Distance.cosine),
+    sparse: const {'keywords': SparseVectorParams()},
+  ),
+);
+final point = Point(
+  id: 1,
+  vector: [0.9, 0.1, 0.1, 0.2],
+  sparseVectors: {
+    'keywords': SparseVector(indices: [1, 5], values: [0.8, 0.4]),
+  },
+);
+```
+
 For larger inputs, bound each request without first copying the entire iterable:
 
 ```dart
@@ -261,7 +287,33 @@ earlier successful batches.
 
 When an operation fails, catch [QdrantException]. It includes the HTTP status
 when Qdrant responded, its error message when available, and the request method
-and URL. It never includes the API key.
+and URL. Successful responses that do not match the supported Qdrant protocol
+are reported the same way, with the parsing failure in `cause`. It never
+includes the API key.
+
+## Versioning and compatibility policy
+
+Until v1.0.0, minor releases may contain documented source-breaking changes
+needed to make the API durable. Each such change includes migration notes in
+the changelog.
+
+Starting with v1.0.0, this package follows semantic versioning:
+
+- Patch releases contain compatible fixes and documentation changes.
+- Minor releases may add endpoints, optional parameters, methods, and
+  SDK-owned implementation subtypes. Callers must not exhaustively switch on
+  `VectorValue` or `FilterCondition`.
+- Removing or changing public members, adding public enum values, raising the
+  minimum Dart SDK, or raising the minimum supported Qdrant version requires a
+  major release.
+- A public member is normally deprecated for at least one minor release before
+  removal in the next major release.
+
+Every release declares the minimum supported and current target Qdrant
+versions through the two files under `tool/` and runs the full integration
+suite against both. CI also analyzes and unit-tests the package on Dart 3.0.7,
+the current minimum SDK, and runs the full release bar on the latest stable
+Dart SDK.
 
 ## Development
 

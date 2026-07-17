@@ -580,6 +580,110 @@ void main() {
     expect(await client.collections.delete(collectionName), isTrue);
   }, tags: 'integration');
 
+  test('sparse-only and empty sparse vectors work against the pinned image',
+      () async {
+    const collectionName = 'qdrant_dart_sparse_only';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: CollectionVectors.named(
+          sparse: const {'keywords': SparseVectorParams()},
+        ),
+      ),
+      isTrue,
+    );
+    await client.points.upsert(collectionName, [
+      Point.named(
+        id: 1,
+        vectors: {
+          'keywords': SparseVector(indices: [1, 3], values: [1, 0.5]),
+        },
+      ),
+      Point.named(
+        id: 2,
+        vectors: {
+          'keywords': SparseVector(indices: const [], values: const []),
+        },
+      ),
+    ]);
+
+    final stored = await client.points.retrieve(
+      collectionName,
+      [1, 2],
+      withVectors: const VectorSelector.all(),
+    );
+    expect(stored, hasLength(2));
+    final empty = stored.singleWhere((point) => point.id == 2);
+    expect(
+      (empty.vectors?.named['keywords'] as SparseVector).indices,
+      isEmpty,
+    );
+
+    final matches = await client.points.query(
+      collectionName,
+      SparseVector(indices: [1, 3], values: [1, 0.5]),
+      using: 'keywords',
+    );
+    expect(matches.first.id, 1);
+
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
+
+  test('default dense and named sparse vectors coexist on one point', () async {
+    const collectionName = 'qdrant_dart_default_dense_sparse';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: CollectionVectors.dense(
+          DenseVectorParams(size: 2, distance: Distance.dot),
+          sparse: const {'keywords': SparseVectorParams()},
+        ),
+      ),
+      isTrue,
+    );
+    await client.points.upsert(collectionName, [
+      Point(
+        id: 1,
+        vector: [1, 0],
+        sparseVectors: {
+          'keywords': SparseVector(indices: [1, 3], values: [1, 0.5]),
+        },
+      ),
+    ]);
+
+    final stored = (await client.points.retrieve(
+      collectionName,
+      [1],
+      withVectors: const VectorSelector.all(),
+    ))
+        .single;
+    expect(stored.vector, [1.0, 0.0]);
+    expect(
+      (stored.vectors?.named['keywords'] as SparseVector).indices,
+      [1, 3],
+    );
+
+    final denseMatches = await client.points.query(
+      collectionName,
+      DenseVector([1, 0]),
+    );
+    expect(denseMatches.first.id, 1);
+    final sparseMatches = await client.points.query(
+      collectionName,
+      SparseVector(indices: [1, 3], values: [1, 0.5]),
+      using: 'keywords',
+    );
+    expect(sparseMatches.first.id, 1);
+
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
+
   test('query prefetch limits candidates before reranking', () async {
     const collectionName = 'qdrant_dart_prefetch';
     final client = QdrantClient(baseUrl: baseUrl);

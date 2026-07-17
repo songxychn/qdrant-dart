@@ -77,24 +77,26 @@ final class CollectionAliasOperations {
           ? Uri(path: 'aliases')
           : Uri(pathSegments: ['collections', collectionName, 'aliases']),
     );
-    final result = _jsonObject(
-      _jsonObject(jsonDecode(response.body), 'response')['result'],
-      'result',
-    );
-    final aliases = result['aliases'];
-    if (aliases is! List) {
-      throw FormatException('Qdrant response has no alias list.');
-    }
-    return aliases.map((value) {
-      final alias = _jsonObject(value, 'result.aliases');
-      return CollectionAlias(
-        aliasName: _string(alias['alias_name'], 'result.aliases.alias_name'),
-        collectionName: _string(
-          alias['collection_name'],
-          'result.aliases.collection_name',
-        ),
+    return response.parse(() {
+      final result = _jsonObject(
+        _jsonObject(jsonDecode(response.body), 'response')['result'],
+        'result',
       );
-    }).toList(growable: false);
+      final aliases = result['aliases'];
+      if (aliases is! List) {
+        throw FormatException('Qdrant response has no alias list.');
+      }
+      return aliases.map((value) {
+        final alias = _jsonObject(value, 'result.aliases');
+        return CollectionAlias(
+          aliasName: _string(alias['alias_name'], 'result.aliases.alias_name'),
+          collectionName: _string(
+            alias['collection_name'],
+            'result.aliases.collection_name',
+          ),
+        );
+      }).toList(growable: false);
+    });
   }
 
   /// Applies [actions] atomically in their provided order.
@@ -108,11 +110,14 @@ final class CollectionAliasOperations {
       path: Uri(pathSegments: ['collections', 'aliases']),
       body: {'actions': actionList.map((action) => action._json).toList()},
     );
-    final result = _jsonObject(jsonDecode(response.body), 'response')['result'];
-    if (result is! bool) {
-      throw FormatException('Qdrant response has no boolean result.');
-    }
-    return result;
+    return response.parse(() {
+      final result =
+          _jsonObject(jsonDecode(response.body), 'response')['result'];
+      if (result is! bool) {
+        throw FormatException('Qdrant response has no boolean result.');
+      }
+      return result;
+    });
   }
 }
 

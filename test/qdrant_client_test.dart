@@ -26,6 +26,12 @@ void main() {
       );
       expect(
         () => QdrantClient(
+          baseUrl: Uri.parse('https://user:secret@qdrant.example'),
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => QdrantClient(
           baseUrl: Uri.parse('http://127.0.0.1:6333'),
           apiKey: '',
         ),
@@ -59,6 +65,12 @@ void main() {
       expect(point.vectors.defaultDense?.values, [0.1, 0.2]);
       expect(point.payload, {'kind': 'example'});
       expect(uuidPoint.id, '5c56c793-69f3-4fbf-87e6-c4bf54c28c26');
+
+      final iterablePoint = Point(
+        id: 2,
+        vector: [0.3, 0.4].where((value) => value > 0),
+      );
+      expect(iterablePoint.vector, [0.3, 0.4]);
     });
 
     test('accepts named dense and sparse vectors and copies inputs', () {
@@ -85,6 +97,19 @@ void main() {
       final sparse = point.vectors.named['keywords'] as SparseVector;
       expect(sparse.indices, [1, 4]);
       expect(sparse.values, [0.3, 0.7]);
+
+      final mixed = Point(
+        id: 2,
+        vector: [0.1, 0.2],
+        sparseVectors: {
+          'keywords': SparseVector(indices: const [], values: const []),
+        },
+      );
+      expect(mixed.vector, [0.1, 0.2]);
+      expect(
+        (mixed.vectors.named['keywords'] as SparseVector).indices,
+        isEmpty,
+      );
     });
 
     test('rejects unsupported IDs and invalid vectors', () {
@@ -139,6 +164,71 @@ void main() {
   });
 
   group('CollectionOperations', () {
+    test('maps incompatible successful responses to QdrantException', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final client = QdrantClient(
+        baseUrl: Uri.parse('http://${server.address.address}:${server.port}'),
+      );
+      addTearDown(() async {
+        client.close(force: true);
+        await server.close(force: true);
+      });
+      server.listen((request) async {
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..write('{not-json');
+        await request.response.close();
+      });
+
+      await expectLater(
+        client.collections.list(),
+        throwsA(
+          isA<QdrantException>()
+              .having((error) => error.method, 'method', 'GET')
+              .having((error) => error.statusCode, 'statusCode', 200)
+              .having((error) => error.uri.path, 'path', '/collections')
+              .having((error) => error.cause, 'cause', isA<FormatException>()),
+        ),
+      );
+    });
+
+    test('accepts collection counts omitted by Qdrant', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final client = QdrantClient(
+        baseUrl: Uri.parse('http://${server.address.address}:${server.port}'),
+      );
+      addTearDown(() async {
+        client.close(force: true);
+        await server.close(force: true);
+      });
+      server.listen((request) async {
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..write(jsonEncode({
+            'result': {
+              'status': 'green',
+              'points_count': null,
+              'indexed_vectors_count': null,
+              'segments_count': 1,
+              'payload_schema': <String, Object?>{},
+              'config': {
+                'params': {
+                  'vectors': {'size': 2, 'distance': 'Dot'},
+                  'sparse_vectors': null,
+                },
+                'optimizer_config': {'indexing_threshold': 20000},
+              },
+            },
+          }));
+        await request.response.close();
+      });
+
+      final collection = await client.collections.get('movies');
+
+      expect(collection.pointsCount, isNull);
+      expect(collection.indexedVectorsCount, isNull);
+    });
+
     test('rejects invalid indexing threshold updates', () async {
       final client = QdrantClient(
         baseUrl: Uri.parse('http://127.0.0.1:6333'),

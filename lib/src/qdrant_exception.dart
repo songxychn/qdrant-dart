@@ -21,7 +21,7 @@ final class QdrantException implements Exception {
   /// The HTTP status returned by Qdrant, or `null` for transport failures.
   final int? statusCode;
 
-  /// The underlying transport failure, when no HTTP response was received.
+  /// The underlying transport or response-parsing failure, when available.
   final Object? cause;
 
   @override

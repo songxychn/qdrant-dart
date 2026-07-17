@@ -99,6 +99,8 @@ final class QdrantTransport {
       );
     }
     return QdrantResponse(
+      method: method,
+      uri: uri,
       statusCode: response.statusCode,
       body: responseBody,
     );
@@ -125,11 +127,37 @@ final class QdrantTransport {
 /// An HTTP response returned by Qdrant's internal transport.
 final class QdrantResponse {
   /// Creates an HTTP response returned by Qdrant.
-  const QdrantResponse({required this.statusCode, required this.body});
+  const QdrantResponse({
+    required this.method,
+    required this.uri,
+    required this.statusCode,
+    required this.body,
+  });
+
+  /// The request method used for this response.
+  final String method;
+
+  /// The request URI used for this response.
+  final Uri uri;
 
   /// The HTTP status code returned by Qdrant.
   final int statusCode;
 
   /// The unparsed response body returned by Qdrant.
   final String body;
+
+  /// Parses a successful response and preserves request context on failure.
+  T parse<T>(T Function() parser) {
+    try {
+      return parser();
+    } on FormatException catch (error) {
+      throw QdrantException(
+        method: method,
+        uri: uri,
+        statusCode: statusCode,
+        message: 'Qdrant returned an incompatible successful response.',
+        cause: error,
+      );
+    }
+  }
 }

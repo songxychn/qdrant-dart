@@ -2,13 +2,15 @@ part of 'qdrant_client.dart';
 
 /// A point to insert into or update in a Qdrant collection.
 final class Point {
-  /// Creates a point with a default dense [vector] and optional [payload].
+  /// Creates a point with a default dense [vector], optional named sparse
+  /// [sparseVectors], and optional [payload].
   Point({
     required Object id,
-    required List<num> vector,
+    required Iterable<num> vector,
+    Map<String, SparseVector> sparseVectors = const {},
     Map<String, Object?>? payload,
   })  : id = _validatePointId(id),
-        vectors = PointVectors._dense(vector),
+        vectors = PointVectors._dense(vector, sparse: sparseVectors),
         payload = payload == null ? null : Map.unmodifiable(payload);
 
   /// Creates a point with named dense or sparse [vectors].
@@ -139,7 +141,7 @@ final class ScrollPage {
 }
 
 /// A condition accepted in Qdrant filter clauses.
-sealed class FilterCondition {
+abstract final class FilterCondition {
   const FilterCondition();
 
   Map<String, Object> _toJson();
@@ -293,7 +295,7 @@ final class PointSelector {
   }
 
   /// Selects every point matching [filter].
-  PointSelector.filter(this.filter) : ids = null;
+  PointSelector.filter(Filter this.filter) : ids = null;
 
   /// Selected point IDs, or `null` when a filter is used.
   final List<Object>? ids;
@@ -469,11 +471,13 @@ final class PointOperations {
         'with_vector': withVectors._toJson(),
       },
     );
-    final result = _result(response);
-    if (result is! List) {
-      throw FormatException('Qdrant response has no point list.');
-    }
-    return result.map(PointRecord._fromJson).toList(growable: false);
+    return response.parse(() {
+      final result = _result(response);
+      if (result is! List) {
+        throw FormatException('Qdrant response has no point list.');
+      }
+      return result.map(PointRecord._fromJson).toList(growable: false);
+    });
   }
 
   /// Deletes points matching [ids] from [collectionName].
@@ -690,11 +694,13 @@ final class PointOperations {
         'exact': exact,
       },
     );
-    final count = _jsonObject(_result(response), 'count result')['count'];
-    if (count is! int || count < 0) {
-      throw FormatException('Qdrant response has no non-negative count.');
-    }
-    return count;
+    return response.parse(() {
+      final count = _jsonObject(_result(response), 'count result')['count'];
+      if (count is! int || count < 0) {
+        throw FormatException('Qdrant response has no non-negative count.');
+      }
+      return count;
+    });
   }
 
   /// Returns one ID-ordered page of points from [collectionName].
@@ -720,18 +726,20 @@ final class PointOperations {
         'with_vector': withVectors._toJson(),
       },
     );
-    final result = _jsonObject(_result(response), 'result');
-    final points = result['points'];
-    if (points is! List) {
-      throw FormatException('Qdrant response has no scroll point list.');
-    }
-    final nextPageOffset = result['next_page_offset'];
-    return ScrollPage._(
-      points: points.map(PointRecord._fromJson).toList(growable: false),
-      nextPageOffset: nextPageOffset == null
-          ? null
-          : PointRecord._idFromJson(nextPageOffset),
-    );
+    return response.parse(() {
+      final result = _jsonObject(_result(response), 'result');
+      final points = result['points'];
+      if (points is! List) {
+        throw FormatException('Qdrant response has no scroll point list.');
+      }
+      final nextPageOffset = result['next_page_offset'];
+      return ScrollPage._(
+        points: points.map(PointRecord._fromJson).toList(growable: false),
+        nextPageOffset: nextPageOffset == null
+            ? null
+            : PointRecord._idFromJson(nextPageOffset),
+      );
+    });
   }
 
   /// Streams every point in [collectionName] using ID-based pagination.
@@ -842,12 +850,14 @@ final class PointOperations {
   }
 
   List<ScoredPoint> _queryPoints(QdrantResponse response) {
-    final result = _jsonObject(_result(response), 'result');
-    final points = result['points'];
-    if (points is! List) {
-      throw FormatException('Qdrant response has no query point list.');
-    }
-    return points.map(ScoredPoint._fromJson).toList(growable: false);
+    return response.parse(() {
+      final result = _jsonObject(_result(response), 'result');
+      final points = result['points'];
+      if (points is! List) {
+        throw FormatException('Qdrant response has no query point list.');
+      }
+      return points.map(ScoredPoint._fromJson).toList(growable: false);
+    });
   }
 
   Uri _pointsPath(
@@ -886,16 +896,18 @@ final class PointOperations {
 }
 
 UpdateResult _updateResult(QdrantResponse response) {
-  final result = _jsonObject(
-    _jsonObject(jsonDecode(response.body), 'response')['result'],
-    'result',
-  );
-  final operationId = result['operation_id'];
-  if (operationId != null && operationId is! int) {
-    throw FormatException('Qdrant response has no integer operation ID.');
-  }
-  return UpdateResult(
-    operationId: operationId as int?,
-    status: UpdateStatus._fromJson(result['status']),
-  );
+  return response.parse(() {
+    final result = _jsonObject(
+      _jsonObject(jsonDecode(response.body), 'response')['result'],
+      'result',
+    );
+    final operationId = result['operation_id'];
+    if (operationId != null && operationId is! int) {
+      throw FormatException('Qdrant response has no integer operation ID.');
+    }
+    return UpdateResult(
+      operationId: operationId as int?,
+      status: UpdateStatus._fromJson(result['status']),
+    );
+  });
 }

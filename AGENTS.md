@@ -7,14 +7,18 @@ client SDK, not a vector database or RAG framework.
 
 ## Working rules
 
-1. Deliver one endpoint family or one cross-cutting concern per change.
-2. Do not add an endpoint without a Docker-backed test against Qdrant.
-3. Prefer REST and Dart standard-library facilities for v0.1. Do not add gRPC,
+1. Before starting development, synchronize the primary worktree's `master`
+   with `origin/master` without discarding local changes, then create a fresh
+   task branch from the updated tip. Do not develop from a stale branch or a
+   detached HEAD.
+2. Deliver one endpoint family or one cross-cutting concern per change.
+3. Do not add an endpoint without a Docker-backed test against Qdrant.
+4. Prefer REST and Dart standard-library facilities for v0.1. Do not add gRPC,
    code generation, retry frameworks, or abstraction layers speculatively.
-4. Keep public types small and Dart-idiomatic. Preserve Qdrant terms where
+5. Keep public types small and Dart-idiomatic. Preserve Qdrant terms where
    they carry semantics.
-5. Never log API keys or encourage privileged credentials in Flutter/web apps.
-6. Update the README example and compatibility note with every public feature.
+6. Never log API keys or encourage privileged credentials in Flutter/web apps.
+7. Update the README example and compatibility note with every public feature.
 
 ## Scope guardrails
 
