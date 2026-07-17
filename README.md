@@ -48,10 +48,11 @@ by the compatibility harness.
 
 The SDK supports HTTP/HTTPS client configuration, API-key authentication,
 request timeouts, typed failure reporting, and collection lifecycle operations
-plus point upsert, retrieval, ID-based deletion, ID-ordered scrolling, and
-dense-vector queries with match/range payload filters, nested Boolean groups,
-and point-ID conditions against `qdrant/qdrant:v1.18.2`. Payload data can be
-set, overwritten, partially deleted, or cleared by point IDs or filters.
+plus point upsert, retrieval, ID- or filter-based deletion, exact or approximate
+counts, ID-ordered scrolling, and dense-vector queries with match/range payload
+filters, nested Boolean groups, and point-ID conditions against
+`qdrant/qdrant:v1.18.2`. Payload data can be set, overwritten, partially
+deleted, or cleared by point IDs or filters.
 Collection creation and point operations support one default dense vector or
 named dense and sparse vectors, and payload indexes can be created, inspected,
 and deleted. Selected vectors can be updated or named vectors deleted without
@@ -92,6 +93,11 @@ try {
       id: 1,
       vector: [0.9, 0.1, 0.1, 0.2],
       payload: {'title': 'The Matrix', 'year': 1999},
+    ),
+    Point(
+      id: 2,
+      vector: [0.1, 0.9, 0.2, 0.1],
+      payload: {'title': 'The Matrix Reloaded', 'year': 2003},
     ),
   ]);
   print(update.status);
@@ -136,6 +142,11 @@ try {
     PointSelector.filter(
       Filter(must: [FieldCondition.match('title', 'The Matrix')]),
     ),
+  );
+  print(await client.points.count('movies'));
+  await client.points.deleteByFilter(
+    'movies',
+    Filter(must: [FieldCondition.range('year', gte: 2000)]),
   );
   await client.points.delete('movies', [1]);
   await client.payloadIndexes.delete('movies', 'year');

@@ -427,6 +427,26 @@ final class PointOperations {
     return _updateResult(response);
   }
 
+  /// Deletes points matching [filter] from [collectionName].
+  ///
+  /// When [wait] is true, Qdrant waits until the deletion has been applied.
+  Future<UpdateResult> deleteByFilter(
+    String collectionName,
+    Filter filter, {
+    bool wait = true,
+  }) async {
+    final response = await _transport.send(
+      method: 'POST',
+      path: _pointsPath(
+        collectionName,
+        operations: const ['delete'],
+        queryParameters: {'wait': wait.toString()},
+      ),
+      body: {'filter': filter._toJson()},
+    );
+    return _updateResult(response);
+  }
+
   /// Merges [payload] into points matching [selector].
   ///
   /// When [wait] is true, Qdrant waits until the update has been applied.
@@ -583,6 +603,29 @@ final class PointOperations {
       body: {'vectors': vectorList, ...selector._toJson()},
     );
     return _updateResult(response);
+  }
+
+  /// Counts points in [collectionName], optionally limited by [filter].
+  ///
+  /// An [exact] count is more reliable while indexing is in progress.
+  Future<int> count(
+    String collectionName, {
+    Filter? filter,
+    bool exact = true,
+  }) async {
+    final response = await _transport.send(
+      method: 'POST',
+      path: _pointsPath(collectionName, operations: const ['count']),
+      body: {
+        if (filter != null) 'filter': filter._toJson(),
+        'exact': exact,
+      },
+    );
+    final count = _jsonObject(_result(response), 'count result')['count'];
+    if (count is! int || count < 0) {
+      throw FormatException('Qdrant response has no non-negative count.');
+    }
+    return count;
   }
 
   /// Returns one ID-ordered page of points from [collectionName].

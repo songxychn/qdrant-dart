@@ -49,6 +49,7 @@ Future<void> main() async {
       withPayload: true,
     );
     print(matches.single.payload?['title']);
+    print(await client.points.count(collectionName));
   } finally {
     try {
       if (created) {

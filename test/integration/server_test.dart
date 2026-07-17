@@ -274,6 +274,56 @@ void main() {
     expect(await client.collections.delete(collectionName), isTrue);
   }, tags: 'integration');
 
+  test('filtered deletion and counts work against the pinned image', () async {
+    const collectionName = 'qdrant_dart_count_delete';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: CollectionVectors.dense(
+          DenseVectorParams(size: 2, distance: Distance.dot),
+        ),
+      ),
+      isTrue,
+    );
+    await client.points.upsert(collectionName, [
+      Point(id: 1, vector: [1, 0], payload: {'group': 'red'}),
+      Point(id: 2, vector: [0, 1], payload: {'group': 'red'}),
+      Point(id: 3, vector: [1, 1], payload: {'group': 'blue'}),
+      Point(id: 4, vector: [0.5, 0.5], payload: {'group': 'blue'}),
+    ]);
+
+    final redFilter = Filter(
+      must: [FieldCondition.match('group', 'red')],
+    );
+    expect(await client.points.count(collectionName), 4);
+    expect(
+      await client.points.count(collectionName, filter: redFilter),
+      2,
+    );
+    expect(
+      await client.points.count(collectionName, exact: false),
+      greaterThanOrEqualTo(0),
+    );
+
+    final deletion = await client.points.deleteByFilter(
+      collectionName,
+      redFilter,
+    );
+    expect(deletion.status, UpdateStatus.completed);
+    expect(await client.points.count(collectionName), 2);
+    expect(await client.points.retrieve(collectionName, [1, 2]), isEmpty);
+    expect(
+      (await client.points.retrieve(collectionName, [3, 4]))
+          .map((point) => point.id),
+      [3, 4],
+    );
+
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
+
   test('point scrolling paginates against the pinned image', () async {
     const collectionName = 'qdrant_dart_scroll';
     final client = QdrantClient(baseUrl: baseUrl);

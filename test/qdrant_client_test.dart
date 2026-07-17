@@ -204,6 +204,15 @@ void main() {
         client.points.delete('movies', []),
         throwsArgumentError,
       );
+      await expectLater(
+        client.points.deleteByFilter(
+          '',
+          Filter(must: [
+            HasIdCondition([1])
+          ]),
+        ),
+        throwsArgumentError,
+      );
       expect(() => PointSelector.ids([]), throwsArgumentError);
       expect(() => PointSelector.ids([true]), throwsArgumentError);
       await expectLater(
@@ -274,6 +283,10 @@ void main() {
           ['image', 'image'],
           PointSelector.ids([1]),
         ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.count(''),
         throwsArgumentError,
       );
       await expectLater(
