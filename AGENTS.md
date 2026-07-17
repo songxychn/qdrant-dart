@@ -37,9 +37,10 @@ dart pub get
 dart format --output=none --set-exit-if-changed .
 dart analyze --fatal-infos
 dart test --exclude-tags integration
-./tool/test-integration.sh
+./tool/test-compatibility.sh
 ```
 
-`tool/qdrant-version` is the single source of truth for the tested Qdrant
-version. Every public endpoint change must include its real-server test, README
-example, and compatibility note in the same change.
+`tool/qdrant-min-version` and `tool/qdrant-version` are the sources of truth for
+the minimum supported and current target Qdrant versions. Every public endpoint
+change must include its real-server test, README example, and compatibility
+note in the same change.

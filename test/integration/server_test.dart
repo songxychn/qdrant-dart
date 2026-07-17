@@ -6,7 +6,8 @@ import 'package:qdrant_dart/qdrant_dart.dart';
 import 'package:test/test.dart';
 
 void main() {
-  final expectedVersion = File('tool/qdrant-version').readAsStringSync().trim();
+  final expectedVersion = Platform.environment['QDRANT_VERSION'] ??
+      File('tool/qdrant-version').readAsStringSync().trim();
   final baseUrl = Uri.parse(
     Platform.environment['QDRANT_URL'] ?? 'http://127.0.0.1:6333',
   );
@@ -74,6 +75,26 @@ void main() {
     expect(
       await client.collections.list(),
       isNot(contains('qdrant_dart_lifecycle')),
+    );
+  }, tags: 'integration');
+
+  test('real server failures preserve typed request context', () async {
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    await expectLater(
+      client.collections.get('qdrant_dart_missing_collection'),
+      throwsA(
+        isA<QdrantException>()
+            .having((error) => error.statusCode, 'statusCode', 404)
+            .having((error) => error.method, 'method', 'GET')
+            .having(
+              (error) => error.uri.path,
+              'path',
+              '/collections/qdrant_dart_missing_collection',
+            )
+            .having((error) => error.message, 'message', isNotEmpty),
+      ),
     );
   }, tags: 'integration');
 

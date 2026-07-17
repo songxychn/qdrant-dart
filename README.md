@@ -40,9 +40,10 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## Compatibility
 
-Development is verified against `qdrant/qdrant:v1.18.2`. The version in
-[`tool/qdrant-version`](tool/qdrant-version) is the source of truth used by the
-integration harness.
+Development is verified against a minimum supported Qdrant `v1.12.0` and the
+current target `v1.18.2`. [`tool/qdrant-min-version`](tool/qdrant-min-version)
+and [`tool/qdrant-version`](tool/qdrant-version) are the sources of truth used
+by the compatibility harness.
 
 The SDK supports HTTP/HTTPS client configuration, API-key authentication,
 request timeouts, typed failure reporting, and collection lifecycle operations
@@ -163,11 +164,12 @@ dart pub get
 dart format --output=none --set-exit-if-changed .
 dart analyze --fatal-infos
 dart test --exclude-tags integration
-./tool/test-integration.sh
+./tool/test-compatibility.sh
 ```
 
-The integration script starts the pinned Qdrant image on a random localhost
-port, runs the real-server tests, and removes the container afterward.
+The compatibility script runs the real-server integration suite against both
+declared Qdrant versions. Each image starts on a random localhost port and is
+removed after its tests finish.
 
 ## Releasing
 
