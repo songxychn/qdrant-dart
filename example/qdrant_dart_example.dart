@@ -15,7 +15,14 @@ Future<void> main() async {
   try {
     created = await client.collections.create(
       collectionName,
-      vectors: VectorParams(size: 4, distance: Distance.cosine),
+      vectors: CollectionVectors.dense(
+        DenseVectorParams(size: 4, distance: Distance.cosine),
+      ),
+    );
+    await client.payloadIndexes.create(
+      collectionName,
+      'year',
+      schema: PayloadSchemaType.integer,
     );
     await client.points.upsert(collectionName, [
       Point(
@@ -27,7 +34,7 @@ Future<void> main() async {
 
     final matches = await client.points.query(
       collectionName,
-      [0.9, 0.1, 0.1, 0.2],
+      DenseVector([0.9, 0.1, 0.1, 0.2]),
       filter: Filter(
         must: [FieldCondition.match('year', 1999)],
       ),

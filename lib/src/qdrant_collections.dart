@@ -1,70 +1,13 @@
 part of 'qdrant_client.dart';
 
-/// Qdrant's distance metrics for dense vectors.
-enum Distance {
-  /// Cosine similarity.
-  cosine('Cosine'),
-
-  /// Dot-product similarity.
-  dot('Dot'),
-
-  /// Euclidean distance.
-  euclid('Euclid'),
-
-  /// Manhattan distance.
-  manhattan('Manhattan');
-
-  const Distance(this._value);
-
-  final String _value;
-
-  static Distance _fromJson(Object? value) => switch (value) {
-        'Cosine' => Distance.cosine,
-        'Dot' => Distance.dot,
-        'Euclid' => Distance.euclid,
-        'Manhattan' => Distance.manhattan,
-        _ => throw FormatException('Unsupported Qdrant distance: $value.'),
-      };
-}
-
-/// Parameters for Qdrant's default dense vector.
-final class VectorParams {
-  /// Creates dense-vector parameters for a collection.
-  VectorParams({required this.size, required this.distance}) {
-    if (size <= 0) {
-      throw ArgumentError.value(size, 'size', 'must be positive.');
-    }
-  }
-
-  /// The number of elements in every vector.
-  final int size;
-
-  /// The metric Qdrant uses to compare vectors.
-  final Distance distance;
-
-  Map<String, Object> _toJson() => {
-        'size': size,
-        'distance': distance._value,
-      };
-
-  static VectorParams _fromJson(Object? value) {
-    final params = _jsonObject(value, 'vectors');
-    final size = params['size'];
-    if (size is! int) {
-      throw FormatException('Qdrant response has no integer vector size.');
-    }
-    return VectorParams(
-        size: size, distance: Distance._fromJson(params['distance']));
-  }
-}
-
-/// A collection's current status, default vector configuration, and counts.
+/// A collection's current status, vector configuration, and counts.
 final class CollectionInfo {
   /// Creates collection details returned by Qdrant.
   const CollectionInfo({
     required this.name,
     required this.status,
     required this.vectors,
+    required this.payloadIndexes,
     required this.pointsCount,
     required this.indexedVectorsCount,
     required this.segmentsCount,
@@ -76,8 +19,11 @@ final class CollectionInfo {
   /// Qdrant's collection status, such as `green`.
   final String status;
 
-  /// The collection's default dense-vector configuration.
-  final VectorParams vectors;
+  /// The collection's dense and sparse vector configuration.
+  final CollectionVectors vectors;
+
+  /// Payload indexes keyed by field name.
+  final Map<String, PayloadIndexInfo> payloadIndexes;
 
   /// The current number of points in the collection.
   final int pointsCount;
@@ -95,12 +41,12 @@ final class CollectionOperations {
 
   final QdrantTransport _transport;
 
-  /// Creates [name] with one default dense vector configuration.
-  Future<bool> create(String name, {required VectorParams vectors}) async {
+  /// Creates [name] with the provided dense and sparse [vectors].
+  Future<bool> create(String name, {required CollectionVectors vectors}) async {
     final response = await _transport.send(
       method: 'PUT',
       path: _collectionPath(name),
-      body: {'vectors': vectors._toJson()},
+      body: vectors._toJson(),
     );
     return _booleanResult(response);
   }
@@ -117,7 +63,21 @@ final class CollectionOperations {
     return CollectionInfo(
       name: name,
       status: _string(result['status'], 'result.status'),
-      vectors: VectorParams._fromJson(params['vectors']),
+      vectors: CollectionVectors._fromJson(
+        params['vectors'],
+        params['sparse_vectors'],
+      ),
+      payloadIndexes: Map.unmodifiable(
+        _jsonObject(
+          result['payload_schema'],
+          'result.payload_schema',
+        ).map(
+          (fieldName, value) => MapEntry(
+            fieldName,
+            PayloadIndexInfo._fromJson(value),
+          ),
+        ),
+      ),
       pointsCount: _integer(result['points_count'], 'result.points_count'),
       indexedVectorsCount: _integer(
         result['indexed_vectors_count'],

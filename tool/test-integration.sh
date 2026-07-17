@@ -2,7 +2,7 @@
 set -eu
 
 root_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-version=$(sed -n '1p' "$root_dir/tool/qdrant-version")
+version=${QDRANT_VERSION:-$(sed -n '1p' "$root_dir/tool/qdrant-version")}
 image="qdrant/qdrant:v$version"
 container="qdrant-dart-test-$$"
 
@@ -24,4 +24,5 @@ fi
 
 cd "$root_dir"
 QDRANT_URL="http://127.0.0.1:$port" \
+  QDRANT_VERSION="$version" \
   dart test --tags integration test/integration

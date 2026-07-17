@@ -37,7 +37,7 @@ request context needed for debugging without exposing API keys.
 
 ## Delivery sequence
 
-Milestone 0 and Milestone 1 are complete for v0.1.0. The next releases favor
+Milestones 0 through 2 are complete through v0.2.0. The next releases favor
 production data management before advanced hybrid-query features.
 
 ### Milestone 0: foundation (complete)
@@ -54,7 +54,7 @@ production data management before advanced hybrid-query features.
 - Payload filters and pagination helpers.
 - README examples exercised by integration tests.
 
-### Milestone 2: extensible search model (v0.2.0)
+### Milestone 2: extensible search model (complete for v0.2.0)
 
 - Make one controlled pre-1.0 revision to the vector and filter models before
   their current default-dense-vector shape becomes entrenched.

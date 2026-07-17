@@ -20,4 +20,4 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed .
       - run: dart analyze --fatal-infos
       - run: dart test --exclude-tags integration
-      - run: ./tool/test-integration.sh
+      - run: ./tool/test-compatibility.sh

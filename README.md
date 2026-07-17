@@ -2,8 +2,9 @@
 
 An idiomatic, REST-first Dart SDK for [Qdrant](https://qdrant.tech/).
 
-> **Status:** v0.1.0 is release-ready for collection lifecycle and core point
-> operations with default dense vectors.
+> **Status:** v0.2.0 is release-ready for collection lifecycle, core point
+> operations, named dense and sparse vectors, extensible filters, and payload
+> indexes.
 
 ## Why this exists
 
@@ -40,17 +41,20 @@ See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## Compatibility
 
-Development is verified against `qdrant/qdrant:v1.18.2`. The version in
-[`tool/qdrant-version`](tool/qdrant-version) is the source of truth used by the
-integration harness.
+Development is verified against a minimum supported Qdrant `v1.12.0` and the
+current target `v1.18.2`. [`tool/qdrant-min-version`](tool/qdrant-min-version)
+and [`tool/qdrant-version`](tool/qdrant-version) are the sources of truth used
+by the compatibility harness.
 
 The SDK supports HTTP/HTTPS client configuration, API-key authentication,
 request timeouts, typed failure reporting, and collection lifecycle operations
 plus point upsert, retrieval, ID-based deletion, ID-ordered scrolling, and
-dense-vector queries with match/range payload filters against
-`qdrant/qdrant:v1.18.2`. Collection creation and point operations currently
-support one default dense vector; named/sparse vectors, nested filters, and
-collection tuning are not yet supported.
+dense-vector queries with match/range payload filters, nested Boolean groups,
+and point-ID conditions against `qdrant/qdrant:v1.18.2`. Collection creation
+and point operations support one default dense vector or named dense and sparse
+vectors, and payload indexes can be created, inspected, and deleted.
+Sparse-vector configuration currently uses Qdrant's defaults; nested payload
+filters and collection tuning are not yet supported.
 
 ## Client setup
 
@@ -71,7 +75,14 @@ final client = QdrantClient(
 try {
   await client.collections.create(
     'movies',
-    vectors: VectorParams(size: 4, distance: Distance.cosine),
+    vectors: CollectionVectors.dense(
+      DenseVectorParams(size: 4, distance: Distance.cosine),
+    ),
+  );
+  await client.payloadIndexes.create(
+    'movies',
+    'year',
+    schema: PayloadSchemaType.integer,
   );
   final update = await client.points.upsert('movies', [
     Point(
@@ -84,7 +95,7 @@ try {
   final stored = await client.points.retrieve(
     'movies',
     [1],
-    withVector: true,
+    withVectors: const VectorSelector.all(),
   );
   print(stored.single.payload?['title']);
   await for (final point in client.points.scrollAll('movies')) {
@@ -92,20 +103,53 @@ try {
   }
   final matches = await client.points.query(
     'movies',
-    [0.9, 0.1, 0.1, 0.2],
+    DenseVector([0.9, 0.1, 0.1, 0.2]),
     filter: Filter(
-      must: [FieldCondition.match('year', 1999)],
+      must: [
+        HasIdCondition([1]),
+        FieldCondition.match('year', 1999),
+      ],
     ),
     withPayload: true,
   );
   print(matches.single.score);
   await client.points.delete('movies', [1]);
+  await client.payloadIndexes.delete('movies', 'year');
   final movies = await client.collections.get('movies');
   print(movies.pointsCount);
   await client.collections.delete('movies');
 } finally {
   client.close();
 }
+```
+
+Named dense and sparse vectors share the same point and query APIs:
+
+```dart
+await client.collections.create(
+  'documents',
+  vectors: CollectionVectors.named(
+    dense: {
+      'text': DenseVectorParams(size: 4, distance: Distance.cosine),
+    },
+    sparse: const {'keywords': SparseVectorParams()},
+  ),
+);
+await client.points.upsert('documents', [
+  Point.named(
+    id: 1,
+    vectors: {
+      'text': DenseVector([0.9, 0.1, 0.1, 0.2]),
+      'keywords': SparseVector(indices: [1, 5], values: [0.8, 0.4]),
+    },
+  ),
+]);
+final sparseMatches = await client.points.query(
+  'documents',
+  SparseVector(indices: [1, 5], values: [0.8, 0.4]),
+  using: 'keywords',
+  withVectors: VectorSelector.named(['text']),
+);
 ```
 
 When an operation fails, catch [QdrantException]. It includes the HTTP status
@@ -121,11 +165,12 @@ dart pub get
 dart format --output=none --set-exit-if-changed .
 dart analyze --fatal-infos
 dart test --exclude-tags integration
-./tool/test-integration.sh
+./tool/test-compatibility.sh
 ```
 
-The integration script starts the pinned Qdrant image on a random localhost
-port, runs the real-server tests, and removes the container afterward.
+The compatibility script runs the real-server integration suite against both
+declared Qdrant versions. Each image starts on a random localhost port and is
+removed after its tests finish.
 
 ## Releasing
 

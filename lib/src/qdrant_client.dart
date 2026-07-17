@@ -4,7 +4,9 @@ import 'qdrant_transport.dart';
 import 'dart:convert';
 
 part 'qdrant_collections.dart';
+part 'qdrant_payload_indexes.dart';
 part 'qdrant_points.dart';
+part 'qdrant_vectors.dart';
 
 /// Configures a connection to a Qdrant server.
 ///
@@ -25,6 +27,7 @@ final class QdrantClient {
       timeout: this.timeout,
     );
     collections = CollectionOperations._(_transport);
+    payloadIndexes = PayloadIndexOperations._(_transport);
     points = PointOperations._(_transport);
   }
 
@@ -41,6 +44,9 @@ final class QdrantClient {
 
   /// Collection lifecycle operations supported by this SDK.
   late final CollectionOperations collections;
+
+  /// Payload-index lifecycle operations supported by this SDK.
+  late final PayloadIndexOperations payloadIndexes;
 
   /// Point operations supported by this SDK.
   late final PointOperations points;
