@@ -8,21 +8,33 @@ final class Point {
     required List<num> vector,
     Map<String, Object?>? payload,
   })  : id = _validatePointId(id),
-        vector = List.unmodifiable(_validateVector(vector)),
+        vectors = PointVectors._dense(vector),
+        payload = payload == null ? null : Map.unmodifiable(payload);
+
+  /// Creates a point with named dense or sparse [vectors].
+  Point.named({
+    required Object id,
+    required Map<String, VectorValue> vectors,
+    Map<String, Object?>? payload,
+  })  : id = _validatePointId(id),
+        vectors = PointVectors._named(vectors),
         payload = payload == null ? null : Map.unmodifiable(payload);
 
   /// A non-negative integer or Qdrant UUID string.
   final Object id;
 
-  /// The point's default dense vector.
-  final List<num> vector;
+  /// The point's default dense vector, or `null` for named-vector points.
+  List<num>? get vector => vectors.defaultDense?.values;
+
+  /// The point's default or named vectors.
+  final PointVectors vectors;
 
   /// JSON-compatible metadata associated with the point.
   final Map<String, Object?>? payload;
 
   Map<String, Object?> _toJson() => {
         'id': id,
-        'vector': vector,
+        'vector': vectors._toJson(),
         if (payload != null) 'payload': payload,
       };
 
@@ -38,17 +50,6 @@ final class Point {
       'id',
       'must be a non-negative integer or a non-empty UUID string.',
     );
-  }
-
-  static List<num> _validateVector(List<num> vector) {
-    if (vector.isEmpty || vector.any((value) => !value.isFinite)) {
-      throw ArgumentError.value(
-        vector,
-        'vector',
-        'must contain one or more finite numbers.',
-      );
-    }
-    return vector;
   }
 }
 
@@ -87,15 +88,18 @@ final class UpdateResult {
 final class PointRecord {
   PointRecord._({
     required this.id,
-    required this.vector,
+    required this.vectors,
     required this.payload,
   });
 
   /// The point's non-negative integer or UUID identifier.
   final Object id;
 
-  /// The default dense vector, or `null` when vectors were not requested.
-  final List<num>? vector;
+  /// The default dense vector, or `null` for named vectors or when omitted.
+  List<num>? get vector => vectors?.defaultDense?.values;
+
+  /// Returned default or named vectors, or `null` when they were not requested.
+  final PointVectors? vectors;
 
   /// The point metadata, or `null` when payloads were not requested.
   final Map<String, Object?>? payload;
@@ -105,22 +109,11 @@ final class PointRecord {
     final id = _idFromJson(record['id']);
 
     final vectorValue = record['vector'];
-    List<num>? vector;
-    if (vectorValue != null) {
-      if (vectorValue is! List ||
-          vectorValue.isEmpty ||
-          vectorValue.any((value) => value is! num || !value.isFinite)) {
-        throw FormatException(
-          'Qdrant response has an invalid default dense vector.',
-        );
-      }
-      vector = List<num>.unmodifiable(vectorValue);
-    }
 
     final payloadValue = record['payload'];
     return PointRecord._(
       id: id,
-      vector: vector,
+      vectors: vectorValue == null ? null : PointVectors._fromJson(vectorValue),
       payload: payloadValue == null
           ? null
           : Map.unmodifiable(_jsonObject(payloadValue, 'result point payload')),
@@ -264,7 +257,7 @@ final class ScoredPoint {
   ScoredPoint._({
     required this.id,
     required this.score,
-    required this.vector,
+    required this.vectors,
     required this.payload,
   });
 
@@ -274,8 +267,11 @@ final class ScoredPoint {
   /// Qdrant's similarity score for this result.
   final double score;
 
-  /// The default dense vector, or `null` when vectors were not requested.
-  final List<num>? vector;
+  /// The default dense vector, or `null` for named vectors or when omitted.
+  List<num>? get vector => vectors?.defaultDense?.values;
+
+  /// Returned default or named vectors, or `null` when they were not requested.
+  final PointVectors? vectors;
 
   /// The point metadata, or `null` when payloads were not requested.
   final Map<String, Object?>? payload;
@@ -290,7 +286,7 @@ final class ScoredPoint {
     return ScoredPoint._(
       id: record.id,
       score: score.toDouble(),
-      vector: record.vector,
+      vectors: record.vectors,
       payload: record.payload,
     );
   }
@@ -330,13 +326,12 @@ final class PointOperations {
 
   /// Retrieves existing points matching [ids] from [collectionName].
   ///
-  /// Payloads are returned by default. Set [withVector] to true when the
-  /// default dense vectors are also needed.
+  /// Payloads are returned by default. Use [withVectors] to request vectors.
   Future<List<PointRecord>> retrieve(
     String collectionName,
     Iterable<Object> ids, {
     bool withPayload = true,
-    bool withVector = false,
+    VectorSelector withVectors = const VectorSelector.none(),
   }) async {
     final idList = _pointIds(ids);
 
@@ -346,7 +341,7 @@ final class PointOperations {
       body: {
         'ids': idList,
         'with_payload': withPayload,
-        'with_vector': withVector,
+        'with_vector': withVectors._toJson(),
       },
     );
     final result = _result(response);
@@ -383,7 +378,7 @@ final class PointOperations {
     int limit = 10,
     Filter? filter,
     bool withPayload = true,
-    bool withVector = false,
+    VectorSelector withVectors = const VectorSelector.none(),
   }) async {
     if (limit <= 0) {
       throw ArgumentError.value(limit, 'limit', 'must be positive.');
@@ -396,7 +391,7 @@ final class PointOperations {
         'limit': limit,
         if (filter != null) 'filter': filter._toJson(),
         'with_payload': withPayload,
-        'with_vector': withVector,
+        'with_vector': withVectors._toJson(),
       },
     );
     final result = _jsonObject(_result(response), 'result');
@@ -419,7 +414,7 @@ final class PointOperations {
     int pageSize = 10,
     Filter? filter,
     bool withPayload = true,
-    bool withVector = false,
+    VectorSelector withVectors = const VectorSelector.none(),
   }) async* {
     Object? offset;
     do {
@@ -429,7 +424,7 @@ final class PointOperations {
         limit: pageSize,
         filter: filter,
         withPayload: withPayload,
-        withVector: withVector,
+        withVectors: withVectors,
       );
       for (final point in page.points) {
         yield point;
@@ -438,16 +433,17 @@ final class PointOperations {
     } while (offset != null);
   }
 
-  /// Finds points nearest to the default dense [vector].
+  /// Finds points nearest to [vector], using the default vector or [using].
   Future<List<ScoredPoint>> query(
     String collectionName,
-    List<num> vector, {
+    VectorValue vector, {
+    String? using,
     Filter? filter,
     int limit = 10,
     int offset = 0,
     num? scoreThreshold,
     bool withPayload = false,
-    bool withVector = false,
+    VectorSelector withVectors = const VectorSelector.none(),
   }) async {
     if (limit <= 0) {
       throw ArgumentError.value(limit, 'limit', 'must be positive.');
@@ -462,20 +458,21 @@ final class PointOperations {
         'must be finite.',
       );
     }
-    final queryVector = List<num>.unmodifiable(
-      Point._validateVector(vector),
-    );
+    if (using != null) {
+      _validateVectorName(using, 'using');
+    }
     final response = await _transport.send(
       method: 'POST',
       path: _pointsPath(collectionName, operation: 'query'),
       body: {
-        'query': queryVector,
+        'query': vector._toJson(),
+        if (using != null) 'using': using,
         if (filter != null) 'filter': filter._toJson(),
         'limit': limit,
         'offset': offset,
         if (scoreThreshold != null) 'score_threshold': scoreThreshold,
         'with_payload': withPayload,
-        'with_vector': withVector,
+        'with_vector': withVectors._toJson(),
       },
     );
     final result = _jsonObject(_result(response), 'result');

@@ -5,6 +5,7 @@ import 'dart:convert';
 
 part 'qdrant_collections.dart';
 part 'qdrant_points.dart';
+part 'qdrant_vectors.dart';
 
 /// Configures a connection to a Qdrant server.
 ///

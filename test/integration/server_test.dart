@@ -53,7 +53,9 @@ void main() {
     expect(
       await client.collections.create(
         'qdrant_dart_lifecycle',
-        vectors: VectorParams(size: 4, distance: Distance.cosine),
+        vectors: CollectionVectors.dense(
+          DenseVectorParams(size: 4, distance: Distance.cosine),
+        ),
       ),
       isTrue,
     );
@@ -62,8 +64,8 @@ void main() {
     final collection = await client.collections.get('qdrant_dart_lifecycle');
     expect(collection.name, 'qdrant_dart_lifecycle');
     expect(collection.status, isNotEmpty);
-    expect(collection.vectors.size, 4);
-    expect(collection.vectors.distance, Distance.cosine);
+    expect(collection.vectors.defaultDense?.size, 4);
+    expect(collection.vectors.defaultDense?.distance, Distance.cosine);
     expect(collection.pointsCount, 0);
     expect(collection.indexedVectorsCount, 0);
     expect(collection.segmentsCount, greaterThanOrEqualTo(1));
@@ -84,7 +86,9 @@ void main() {
     expect(
       await client.collections.create(
         collectionName,
-        vectors: VectorParams(size: 4, distance: Distance.cosine),
+        vectors: CollectionVectors.dense(
+          DenseVectorParams(size: 4, distance: Distance.cosine),
+        ),
       ),
       isTrue,
     );
@@ -116,7 +120,7 @@ void main() {
     final stored = (await client.points.retrieve(
       collectionName,
       [1],
-      withVector: true,
+      withVectors: const VectorSelector.all(),
     ))
         .single;
     expect(stored.id, 1);
@@ -163,7 +167,9 @@ void main() {
     expect(
       await client.collections.create(
         collectionName,
-        vectors: VectorParams(size: 2, distance: Distance.dot),
+        vectors: CollectionVectors.dense(
+          DenseVectorParams(size: 2, distance: Distance.dot),
+        ),
       ),
       isTrue,
     );
@@ -176,7 +182,7 @@ void main() {
     final firstPage = await client.points.scroll(
       collectionName,
       limit: 2,
-      withVector: true,
+      withVectors: const VectorSelector.all(),
     );
     expect(firstPage.points.map((point) => point.id), [1, 2]);
     expect(firstPage.points.first.payload, {'page': 'first'});
@@ -207,6 +213,82 @@ void main() {
     expect(await client.collections.delete(collectionName), isTrue);
   }, tags: 'integration');
 
+  test('named dense and sparse vectors work against the pinned image',
+      () async {
+    const collectionName = 'qdrant_dart_named_vectors';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: CollectionVectors.named(
+          dense: {
+            'image': DenseVectorParams(size: 2, distance: Distance.dot),
+          },
+          sparse: const {'keywords': SparseVectorParams()},
+        ),
+      ),
+      isTrue,
+    );
+
+    final collection = await client.collections.get(collectionName);
+    expect(collection.vectors.defaultDense, isNull);
+    expect(collection.vectors.namedDense['image']?.size, 2);
+    expect(collection.vectors.sparse, contains('keywords'));
+
+    await client.points.upsert(collectionName, [
+      Point.named(
+        id: 1,
+        vectors: {
+          'image': DenseVector([1, 0]),
+          'keywords': SparseVector(indices: [1, 3], values: [1, 0.5]),
+        },
+        payload: {'title': 'first'},
+      ),
+      Point.named(
+        id: 2,
+        vectors: {
+          'image': DenseVector([0, 1]),
+          'keywords': SparseVector(indices: [2, 3], values: [1, 0.2]),
+        },
+        payload: {'title': 'second'},
+      ),
+    ]);
+
+    final stored = (await client.points.retrieve(
+      collectionName,
+      [1],
+      withVectors: VectorSelector.named(['image', 'keywords']),
+    ))
+        .single;
+    expect((stored.vectors?.named['image'] as DenseVector).values, [1.0, 0.0]);
+    final storedSparse = stored.vectors?.named['keywords'] as SparseVector;
+    expect(storedSparse.indices, [1, 3]);
+    expect(storedSparse.values, [1.0, 0.5]);
+
+    final denseMatches = await client.points.query(
+      collectionName,
+      DenseVector([1, 0]),
+      using: 'image',
+      withVectors: VectorSelector.named(['image']),
+    );
+    expect(denseMatches.first.id, 1);
+    expect(
+      (denseMatches.first.vectors?.named['image'] as DenseVector).values,
+      [1.0, 0.0],
+    );
+
+    final sparseMatches = await client.points.query(
+      collectionName,
+      SparseVector(indices: [1, 3], values: [1, 0.5]),
+      using: 'keywords',
+    );
+    expect(sparseMatches.first.id, 1);
+
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
+
   test('point query applies payload filters against the pinned image',
       () async {
     const collectionName = 'qdrant_dart_query';
@@ -216,7 +298,9 @@ void main() {
     expect(
       await client.collections.create(
         collectionName,
-        vectors: VectorParams(size: 3, distance: Distance.dot),
+        vectors: CollectionVectors.dense(
+          DenseVectorParams(size: 3, distance: Distance.dot),
+        ),
       ),
       isTrue,
     );
@@ -245,7 +329,7 @@ void main() {
 
     final matches = await client.points.query(
       collectionName,
-      [1, 0, 0],
+      DenseVector([1, 0, 0]),
       filter: Filter(
         must: [
           FieldCondition.match('city', 'London'),
@@ -254,7 +338,7 @@ void main() {
         mustNot: [FieldCondition.match('active', true)],
       ),
       withPayload: true,
-      withVector: true,
+      withVectors: const VectorSelector.all(),
     );
     expect(matches, hasLength(1));
     expect(matches.single.id, 2);
@@ -264,7 +348,7 @@ void main() {
 
     final alternatives = await client.points.query(
       collectionName,
-      [1, 0, 0],
+      DenseVector([1, 0, 0]),
       filter: Filter(
         should: [
           FieldCondition.match('city', 'Berlin'),
@@ -276,7 +360,7 @@ void main() {
 
     final secondStrongest = await client.points.query(
       collectionName,
-      [1, 0, 0],
+      DenseVector([1, 0, 0]),
       limit: 1,
       offset: 1,
       scoreThreshold: 0.85,

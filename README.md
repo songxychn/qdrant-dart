@@ -48,9 +48,10 @@ The SDK supports HTTP/HTTPS client configuration, API-key authentication,
 request timeouts, typed failure reporting, and collection lifecycle operations
 plus point upsert, retrieval, ID-based deletion, ID-ordered scrolling, and
 dense-vector queries with match/range payload filters against
-`qdrant/qdrant:v1.18.2`. Collection creation and point operations currently
-support one default dense vector; named/sparse vectors, nested filters, and
-collection tuning are not yet supported.
+`qdrant/qdrant:v1.18.2`. Collection creation and point operations support one
+default dense vector or named dense and sparse vectors. Sparse-vector
+configuration currently uses Qdrant's defaults; nested filters and collection
+tuning are not yet supported.
 
 ## Client setup
 
@@ -71,7 +72,9 @@ final client = QdrantClient(
 try {
   await client.collections.create(
     'movies',
-    vectors: VectorParams(size: 4, distance: Distance.cosine),
+    vectors: CollectionVectors.dense(
+      DenseVectorParams(size: 4, distance: Distance.cosine),
+    ),
   );
   final update = await client.points.upsert('movies', [
     Point(
@@ -84,7 +87,7 @@ try {
   final stored = await client.points.retrieve(
     'movies',
     [1],
-    withVector: true,
+    withVectors: const VectorSelector.all(),
   );
   print(stored.single.payload?['title']);
   await for (final point in client.points.scrollAll('movies')) {
@@ -92,7 +95,7 @@ try {
   }
   final matches = await client.points.query(
     'movies',
-    [0.9, 0.1, 0.1, 0.2],
+    DenseVector([0.9, 0.1, 0.1, 0.2]),
     filter: Filter(
       must: [FieldCondition.match('year', 1999)],
     ),
@@ -106,6 +109,35 @@ try {
 } finally {
   client.close();
 }
+```
+
+Named dense and sparse vectors share the same point and query APIs:
+
+```dart
+await client.collections.create(
+  'documents',
+  vectors: CollectionVectors.named(
+    dense: {
+      'text': DenseVectorParams(size: 4, distance: Distance.cosine),
+    },
+    sparse: const {'keywords': SparseVectorParams()},
+  ),
+);
+await client.points.upsert('documents', [
+  Point.named(
+    id: 1,
+    vectors: {
+      'text': DenseVector([0.9, 0.1, 0.1, 0.2]),
+      'keywords': SparseVector(indices: [1, 5], values: [0.8, 0.4]),
+    },
+  ),
+]);
+final sparseMatches = await client.points.query(
+  'documents',
+  SparseVector(indices: [1, 5], values: [0.8, 0.4]),
+  using: 'keywords',
+  withVectors: VectorSelector.named(['text']),
+);
 ```
 
 When an operation fails, catch [QdrantException]. It includes the HTTP status
