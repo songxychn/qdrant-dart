@@ -69,11 +69,13 @@ final class QdrantClient {
         'must be an absolute HTTP or HTTPS URL.',
       );
     }
-    if (baseUrl.hasQuery || baseUrl.hasFragment) {
+    if (baseUrl.hasQuery ||
+        baseUrl.hasFragment ||
+        baseUrl.userInfo.isNotEmpty) {
       throw ArgumentError.value(
         baseUrl,
         'baseUrl',
-        'must not contain a query or fragment.',
+        'must not contain credentials, a query, or a fragment.',
       );
     }
 

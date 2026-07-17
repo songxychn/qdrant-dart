@@ -293,7 +293,7 @@ final class PointSelector {
   }
 
   /// Selects every point matching [filter].
-  PointSelector.filter(this.filter) : ids = null;
+  PointSelector.filter(Filter this.filter) : ids = null;
 
   /// Selected point IDs, or `null` when a filter is used.
   final List<Object>? ids;

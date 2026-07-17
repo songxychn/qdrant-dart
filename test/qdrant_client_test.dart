@@ -26,6 +26,12 @@ void main() {
       );
       expect(
         () => QdrantClient(
+          baseUrl: Uri.parse('https://user:secret@qdrant.example'),
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => QdrantClient(
           baseUrl: Uri.parse('http://127.0.0.1:6333'),
           apiKey: '',
         ),

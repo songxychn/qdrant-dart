@@ -72,7 +72,8 @@ dense and sparse rankings with Reciprocal Rank Fusion (RRF).
 
 Use the client only in a trusted Dart service or CLI. Read API keys from the
 server-side environment rather than embedding them in a Flutter or browser
-application.
+application. Pass credentials through `apiKey`; URLs containing user info are
+rejected so credentials cannot leak through request diagnostics.
 
 ```dart
 import 'dart:io';
