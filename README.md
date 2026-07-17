@@ -2,9 +2,9 @@
 
 An idiomatic, REST-first Dart SDK for [Qdrant](https://qdrant.tech/).
 
-> **Status:** v0.4.0 is release-ready for collection lifecycle, production data
-> maintenance, and named dense/sparse search with multi-stage prefetch and RRF
-> fusion.
+> **Status:** v0.5.0 is release-ready for collection lifecycle, production data
+> maintenance, atomic collection aliases, bounded indexing-threshold tuning,
+> and named dense/sparse search with multi-stage prefetch and RRF fusion.
 
 ## Why this exists
 
