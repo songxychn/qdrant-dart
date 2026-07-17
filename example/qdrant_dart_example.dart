@@ -36,6 +36,9 @@ Future<void> main() async {
       {'featured': true},
       PointSelector.ids([1]),
     );
+    await client.points.updateVectors(collectionName, [
+      PointVectorUpdate(id: 1, vector: [0.8, 0.2, 0.1, 0.2]),
+    ]);
 
     final matches = await client.points.query(
       collectionName,

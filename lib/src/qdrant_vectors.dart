@@ -312,6 +312,32 @@ final class PointVectors {
   }
 }
 
+/// A point ID and the vectors to update without replacing its payload.
+final class PointVectorUpdate {
+  /// Updates the default dense [vector] for [id].
+  PointVectorUpdate({required Object id, required Iterable<num> vector})
+      : id = Point._validatePointId(id),
+        vectors = PointVectors._dense(vector);
+
+  /// Updates the provided named dense or sparse [vectors] for [id].
+  PointVectorUpdate.named({
+    required Object id,
+    required Map<String, VectorValue> vectors,
+  })  : id = Point._validatePointId(id),
+        vectors = PointVectors._named(vectors);
+
+  /// The point's non-negative integer or UUID identifier.
+  final Object id;
+
+  /// The default or named vectors to update.
+  final PointVectors vectors;
+
+  Map<String, Object?> _toJson() => {
+        'id': id,
+        'vector': vectors._toJson(),
+      };
+}
+
 /// Selects which vectors Qdrant should include in point responses.
 final class VectorSelector {
   const VectorSelector._(this._value);

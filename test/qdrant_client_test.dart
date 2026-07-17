@@ -234,6 +234,48 @@ void main() {
         client.points.clearPayload('', PointSelector.ids([1])),
         throwsArgumentError,
       );
+      expect(
+        () => PointVectorUpdate(id: true, vector: [0.1]),
+        throwsArgumentError,
+      );
+      expect(
+        () => PointVectorUpdate.named(id: 1, vectors: const {}),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.updateVectors('movies', []),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.updateVectors('', [
+          PointVectorUpdate(id: 1, vector: [0.1]),
+        ]),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.deleteVectors(
+          'movies',
+          [],
+          PointSelector.ids([1]),
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.deleteVectors(
+          'movies',
+          ['', 'image'],
+          PointSelector.ids([1]),
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.deleteVectors(
+          'movies',
+          ['image', 'image'],
+          PointSelector.ids([1]),
+        ),
+        throwsArgumentError,
+      );
       await expectLater(
         client.points.scroll('', limit: 1),
         throwsArgumentError,

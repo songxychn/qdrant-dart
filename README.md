@@ -54,8 +54,10 @@ and point-ID conditions against `qdrant/qdrant:v1.18.2`. Payload data can be
 set, overwritten, partially deleted, or cleared by point IDs or filters.
 Collection creation and point operations support one default dense vector or
 named dense and sparse vectors, and payload indexes can be created, inspected,
-and deleted. Sparse-vector configuration currently uses Qdrant's defaults;
-nested payload filters and collection tuning are not yet supported.
+and deleted. Selected vectors can be updated or named vectors deleted without
+replacing the rest of a point. Sparse-vector configuration currently uses
+Qdrant's defaults; nested payload filters and collection tuning are not yet
+supported.
 
 ## Client setup
 
@@ -166,11 +168,22 @@ await client.points.upsert('documents', [
     },
   ),
 ]);
+await client.points.updateVectors('documents', [
+  PointVectorUpdate.named(
+    id: 1,
+    vectors: {'text': DenseVector([0.8, 0.2, 0.1, 0.3])},
+  ),
+]);
 final sparseMatches = await client.points.query(
   'documents',
   SparseVector(indices: [1, 5], values: [0.8, 0.4]),
   using: 'keywords',
   withVectors: VectorSelector.named(['text']),
+);
+await client.points.deleteVectors(
+  'documents',
+  ['keywords'],
+  PointSelector.ids([1]),
 );
 ```
 

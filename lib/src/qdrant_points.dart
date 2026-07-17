@@ -524,6 +524,67 @@ final class PointOperations {
     return _updateResult(response);
   }
 
+  /// Updates selected vectors without replacing each point's other data.
+  ///
+  /// When [wait] is true, Qdrant waits until the update has been applied.
+  Future<UpdateResult> updateVectors(
+    String collectionName,
+    Iterable<PointVectorUpdate> updates, {
+    bool wait = true,
+  }) async {
+    final updateList = updates.toList(growable: false);
+    if (updateList.isEmpty) {
+      throw ArgumentError.value(updates, 'updates', 'must not be empty.');
+    }
+    final response = await _transport.send(
+      method: 'PUT',
+      path: _pointsPath(
+        collectionName,
+        operations: const ['vectors'],
+        queryParameters: {'wait': wait.toString()},
+      ),
+      body: {
+        'points': updateList.map((update) => update._toJson()).toList(),
+      },
+    );
+    return _updateResult(response);
+  }
+
+  /// Deletes named [vectors] from points matching [selector].
+  ///
+  /// When [wait] is true, Qdrant waits until the deletion has been applied.
+  Future<UpdateResult> deleteVectors(
+    String collectionName,
+    Iterable<String> vectors,
+    PointSelector selector, {
+    bool wait = true,
+  }) async {
+    final vectorList = vectors.toList(growable: false);
+    if (vectorList.isEmpty) {
+      throw ArgumentError.value(vectors, 'vectors', 'must not be empty.');
+    }
+    for (final vector in vectorList) {
+      _validateVectorName(vector, 'vectors');
+    }
+    if (vectorList.toSet().length != vectorList.length) {
+      throw ArgumentError.value(
+        vectors,
+        'vectors',
+        'must not contain duplicates.',
+      );
+    }
+    final response = await _transport.send(
+      method: 'POST',
+      path: _pointsPath(
+        collectionName,
+        operations: const ['vectors', 'delete'],
+        queryParameters: {'wait': wait.toString()},
+      ),
+      body: {'vectors': vectorList, ...selector._toJson()},
+    );
+    return _updateResult(response);
+  }
+
   /// Returns one ID-ordered page of points from [collectionName].
   Future<ScrollPage> scroll(
     String collectionName, {

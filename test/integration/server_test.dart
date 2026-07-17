@@ -404,6 +404,89 @@ void main() {
     expect(await client.collections.delete(collectionName), isTrue);
   }, tags: 'integration');
 
+  test('vector updates and deletion work against the pinned image', () async {
+    const collectionName = 'qdrant_dart_vector_updates';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: CollectionVectors.named(
+          dense: {
+            'image': DenseVectorParams(size: 2, distance: Distance.dot),
+            'text': DenseVectorParams(size: 2, distance: Distance.dot),
+          },
+          sparse: const {'keywords': SparseVectorParams()},
+        ),
+      ),
+      isTrue,
+    );
+    await client.points.upsert(collectionName, [
+      Point.named(
+        id: 1,
+        vectors: {
+          'image': DenseVector([1, 0]),
+          'text': DenseVector([0, 1]),
+          'keywords': SparseVector(indices: [1], values: [1]),
+        },
+        payload: {'group': 'red'},
+      ),
+      Point.named(
+        id: 2,
+        vectors: {
+          'image': DenseVector([0, 1]),
+          'text': DenseVector([1, 0]),
+          'keywords': SparseVector(indices: [2], values: [1]),
+        },
+        payload: {'group': 'blue'},
+      ),
+    ]);
+
+    final update = await client.points.updateVectors(collectionName, [
+      PointVectorUpdate.named(
+        id: 1,
+        vectors: {
+          'image': DenseVector([0.5, 0.5]),
+          'keywords': SparseVector(indices: [3], values: [0.75]),
+        },
+      ),
+    ]);
+    expect(update.status, UpdateStatus.completed);
+    final updated = (await client.points.retrieve(
+      collectionName,
+      [1],
+      withVectors: const VectorSelector.all(),
+    ))
+        .single;
+    expect(updated.payload, {'group': 'red'});
+    expect((updated.vectors?.named['image'] as DenseVector).values, [0.5, 0.5]);
+    expect((updated.vectors?.named['text'] as DenseVector).values, [0.0, 1.0]);
+    final sparse = updated.vectors?.named['keywords'] as SparseVector;
+    expect(sparse.indices, [3]);
+    expect(sparse.values, [0.75]);
+
+    final deletion = await client.points.deleteVectors(
+      collectionName,
+      ['image'],
+      PointSelector.filter(
+        Filter(must: [FieldCondition.match('group', 'red')]),
+      ),
+    );
+    expect(deletion.status, UpdateStatus.completed);
+    final afterDeletion = (await client.points.retrieve(
+      collectionName,
+      [1, 2],
+      withVectors: const VectorSelector.all(),
+    ));
+    expect(afterDeletion.first.vectors?.named, isNot(contains('image')));
+    expect(afterDeletion.first.vectors?.named, contains('text'));
+    expect(afterDeletion.first.vectors?.named, contains('keywords'));
+    expect(afterDeletion.last.vectors?.named, contains('image'));
+
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
+
   test('payload index lifecycle works against the pinned image', () async {
     const collectionName = 'qdrant_dart_payload_indexes';
     final client = QdrantClient(baseUrl: baseUrl);
