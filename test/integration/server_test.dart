@@ -70,6 +70,17 @@ void main() {
     expect(collection.pointsCount, 0);
     expect(collection.indexedVectorsCount, 0);
     expect(collection.segmentsCount, greaterThanOrEqualTo(1));
+    expect(collection.indexingThreshold, greaterThanOrEqualTo(0));
+
+    expect(
+      await client.collections.updateIndexingThreshold(
+        'qdrant_dart_lifecycle',
+        0,
+      ),
+      isTrue,
+    );
+    final tuned = await client.collections.get('qdrant_dart_lifecycle');
+    expect(tuned.indexingThreshold, 0);
 
     expect(await client.collections.delete('qdrant_dart_lifecycle'), isTrue);
     expect(

@@ -35,6 +35,7 @@ Future<void> main() async {
       'year',
       schema: PayloadSchemaType.integer,
     );
+    await client.collections.updateIndexingThreshold(collectionName, 0);
     await client.points.upsertInBatches(
       collectionName,
       [
@@ -46,6 +47,7 @@ Future<void> main() async {
       ],
       batchSize: 100,
     );
+    await client.collections.updateIndexingThreshold(collectionName, 20000);
     await client.points.setPayload(
       collectionName,
       {'featured': true},

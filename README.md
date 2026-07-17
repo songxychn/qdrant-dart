@@ -58,9 +58,10 @@ Collection creation and point operations support one default dense vector or
 named dense and sparse vectors, and payload indexes can be created, inspected,
 and deleted. Selected vectors can be updated or named vectors deleted without
 replacing the rest of a point. Sparse-vector configuration currently uses
-Qdrant's defaults; nested payload filters and collection tuning are not yet
-supported. Large point iterables can be upserted in bounded sequential batches
-without hiding any per-batch update result. Query prefetches can select
+Qdrant's defaults; nested payload filters and collection tuning beyond the
+optimizer indexing threshold are not yet supported. Large point iterables can
+be upserted in bounded sequential batches without hiding any per-batch update
+result. Query prefetches can select
 candidates with one vector before the main vector reranks them, or combine
 dense and sparse rankings with Reciprocal Rank Fusion (RRF).
 
@@ -92,6 +93,7 @@ try {
     'year',
     schema: PayloadSchemaType.integer,
   );
+  await client.collections.updateIndexingThreshold('movies', 0);
   final update = await client.points.upsert('movies', [
     Point(
       id: 1,
@@ -104,6 +106,7 @@ try {
       payload: {'title': 'The Matrix Reloaded', 'year': 2003},
     ),
   ]);
+  await client.collections.updateIndexingThreshold('movies', 20000);
   print(update.status);
   final stored = await client.points.retrieve(
     'movies',

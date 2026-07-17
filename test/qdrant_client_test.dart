@@ -138,6 +138,24 @@ void main() {
     });
   });
 
+  group('CollectionOperations', () {
+    test('rejects invalid indexing threshold updates', () async {
+      final client = QdrantClient(
+        baseUrl: Uri.parse('http://127.0.0.1:6333'),
+      );
+      addTearDown(client.close);
+
+      await expectLater(
+        client.collections.updateIndexingThreshold('', 0),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.collections.updateIndexingThreshold('movies', -1),
+        throwsArgumentError,
+      );
+    });
+  });
+
   group('CollectionAliasOperations', () {
     test('rejects empty names and action lists', () async {
       final client = QdrantClient(
