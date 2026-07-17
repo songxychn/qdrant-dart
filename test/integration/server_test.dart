@@ -496,6 +496,144 @@ void main() {
     expect(await client.collections.delete(collectionName), isTrue);
   }, tags: 'integration');
 
+  test('query prefetch limits candidates before reranking', () async {
+    const collectionName = 'qdrant_dart_prefetch';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: CollectionVectors.named(
+          dense: {
+            'coarse': DenseVectorParams(size: 2, distance: Distance.dot),
+            'fine': DenseVectorParams(size: 2, distance: Distance.dot),
+          },
+        ),
+      ),
+      isTrue,
+    );
+    await client.points.upsert(collectionName, [
+      Point.named(
+        id: 1,
+        vectors: {
+          'coarse': DenseVector([1, 0]),
+          'fine': DenseVector([0, 1]),
+        },
+        payload: {'eligible': true},
+      ),
+      Point.named(
+        id: 2,
+        vectors: {
+          'coarse': DenseVector([0.9, 0.1]),
+          'fine': DenseVector([1, 0]),
+        },
+        payload: {'eligible': true},
+      ),
+      Point.named(
+        id: 3,
+        vectors: {
+          'coarse': DenseVector([0, 1]),
+          'fine': DenseVector([1, 0]),
+        },
+        payload: {'eligible': false},
+      ),
+    ]);
+
+    final matches = await client.points.query(
+      collectionName,
+      DenseVector([1, 0]),
+      prefetch: [
+        Prefetch(
+          query: DenseVector([1, 0]),
+          using: 'coarse',
+          filter: Filter(
+            must: [FieldCondition.match('eligible', true)],
+          ),
+          limit: 2,
+        ),
+      ],
+      using: 'fine',
+      limit: 1,
+      withPayload: true,
+    );
+    expect(matches.single.id, 2);
+    expect(matches.single.payload, {'eligible': true});
+
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
+
+  test('RRF fuses dense and sparse query rankings', () async {
+    const collectionName = 'qdrant_dart_rrf';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: CollectionVectors.named(
+          dense: {
+            'dense': DenseVectorParams(size: 2, distance: Distance.dot),
+          },
+          sparse: const {'sparse': SparseVectorParams()},
+        ),
+      ),
+      isTrue,
+    );
+    await client.points.upsert(collectionName, [
+      Point.named(
+        id: 1,
+        vectors: {
+          'dense': DenseVector([1, 0]),
+          'sparse': SparseVector(indices: [1], values: [1]),
+        },
+        payload: {'title': 'both'},
+      ),
+      Point.named(
+        id: 2,
+        vectors: {
+          'dense': DenseVector([0.9, 0.1]),
+          'sparse': SparseVector(indices: [2], values: [1]),
+        },
+        payload: {'title': 'dense'},
+      ),
+      Point.named(
+        id: 3,
+        vectors: {
+          'dense': DenseVector([0, 1]),
+          'sparse': SparseVector(indices: [1], values: [0.9]),
+        },
+        payload: {'title': 'sparse'},
+      ),
+    ]);
+
+    final matches = await client.points.queryRrf(
+      collectionName,
+      [
+        Prefetch(
+          query: DenseVector([1, 0]),
+          using: 'dense',
+          limit: 3,
+        ),
+        Prefetch(
+          query: SparseVector(indices: [1], values: [1]),
+          using: 'sparse',
+          limit: 3,
+        ),
+      ],
+      limit: 3,
+      withPayload: true,
+      withVectors: VectorSelector.named(['dense']),
+    );
+    expect(matches, hasLength(3));
+    expect(matches.first.id, 1);
+    expect(matches.first.payload, {'title': 'both'});
+    expect(matches.first.vectors?.named, contains('dense'));
+    expect(matches.map((point) => point.id).toSet(), {1, 2, 3});
+
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
+
   test('vector updates and deletion work against the pinned image', () async {
     const collectionName = 'qdrant_dart_vector_updates';
     final client = QdrantClient(baseUrl: baseUrl);

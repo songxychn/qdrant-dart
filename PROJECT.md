@@ -37,8 +37,8 @@ request context needed for debugging without exposing API keys.
 
 ## Delivery sequence
 
-Milestones 0 through 3 are complete through v0.3.0. The next release adds
-advanced hybrid-query features on top of the production data lifecycle.
+Milestones 0 through 4 are complete through v0.4.0. The next release focuses on
+the narrow production operations requested by real deployments.
 
 ### Milestone 0: foundation (complete)
 
@@ -73,7 +73,7 @@ advanced hybrid-query features on top of the production data lifecycle.
 - Delete points by filter and expose count operations.
 - Add bounded, chunked ingestion helpers without hiding Qdrant update results.
 
-### Milestone 4: hybrid queries (v0.4.0)
+### Milestone 4: hybrid queries (complete for v0.4.0)
 
 - Extend the Query API with named and sparse queries.
 - Add prefetch and reciprocal-rank or distribution-based score fusion.

@@ -2,9 +2,9 @@
 
 An idiomatic, REST-first Dart SDK for [Qdrant](https://qdrant.tech/).
 
-> **Status:** v0.3.0 is release-ready for collection lifecycle, typed search,
-> payload and vector maintenance, filtered deletion and counts, and bounded
-> batch ingestion.
+> **Status:** v0.4.0 is release-ready for collection lifecycle, production data
+> maintenance, and named dense/sparse search with multi-stage prefetch and RRF
+> fusion.
 
 ## Why this exists
 
@@ -48,18 +48,20 @@ by the compatibility harness.
 
 The SDK supports HTTP/HTTPS client configuration, API-key authentication,
 request timeouts, typed failure reporting, and collection lifecycle operations
-plus point upsert, retrieval, ID- or filter-based deletion, exact or approximate
-counts, ID-ordered scrolling, and dense-vector queries with match/range payload
-filters, nested Boolean groups, and point-ID conditions against
-`qdrant/qdrant:v1.18.2`. Payload data can be set, overwritten, partially
-deleted, or cleared by point IDs or filters.
+plus point upsert, retrieval, ID- or filter-based deletion, exact or
+approximate counts, ID-ordered scrolling, and dense- or sparse-vector queries
+with match/range payload filters, nested Boolean groups, and point-ID
+conditions against `qdrant/qdrant:v1.18.2`. Payload data can be set,
+overwritten, partially deleted, or cleared by point IDs or filters.
 Collection creation and point operations support one default dense vector or
 named dense and sparse vectors, and payload indexes can be created, inspected,
 and deleted. Selected vectors can be updated or named vectors deleted without
 replacing the rest of a point. Sparse-vector configuration currently uses
 Qdrant's defaults; nested payload filters and collection tuning are not yet
 supported. Large point iterables can be upserted in bounded sequential batches
-without hiding any per-batch update result.
+without hiding any per-batch update result. Query prefetches can select
+candidates with one vector before the main vector reranks them, or combine
+dense and sparse rankings with Reciprocal Rank Fusion (RRF).
 
 ## Client setup
 
@@ -191,6 +193,34 @@ final sparseMatches = await client.points.query(
   SparseVector(indices: [1, 5], values: [0.8, 0.4]),
   using: 'keywords',
   withVectors: VectorSelector.named(['text']),
+);
+final reranked = await client.points.query(
+  'documents',
+  DenseVector([0.8, 0.2, 0.1, 0.3]),
+  prefetch: [
+    Prefetch(
+      query: SparseVector(indices: [1, 5], values: [0.8, 0.4]),
+      using: 'keywords',
+      limit: 20,
+    ),
+  ],
+  using: 'text',
+);
+final hybridMatches = await client.points.queryRrf(
+  'documents',
+  [
+    Prefetch(
+      query: DenseVector([0.8, 0.2, 0.1, 0.3]),
+      using: 'text',
+      limit: 20,
+    ),
+    Prefetch(
+      query: SparseVector(indices: [1, 5], values: [0.8, 0.4]),
+      using: 'keywords',
+      limit: 20,
+    ),
+  ],
+  withPayload: true,
 );
 await client.points.deleteVectors(
   'documents',

@@ -308,6 +308,43 @@ final class PointSelector {
       };
 }
 
+/// A candidate-producing sub-query run before the main Query API request.
+final class Prefetch {
+  /// Creates a vector prefetch using the default vector or named [using].
+  Prefetch({
+    required this.query,
+    this.using,
+    this.filter,
+    this.limit = 10,
+  }) {
+    if (limit <= 0) {
+      throw ArgumentError.value(limit, 'limit', 'must be positive.');
+    }
+    if (using != null) {
+      _validateVectorName(using!, 'using');
+    }
+  }
+
+  /// Dense or sparse vector used to select candidates.
+  final VectorValue query;
+
+  /// Named vector to query, or `null` for the default vector.
+  final String? using;
+
+  /// Optional payload filter applied while selecting candidates.
+  final Filter? filter;
+
+  /// Maximum number of candidates returned to the main query.
+  final int limit;
+
+  Map<String, Object> _toJson() => {
+        'query': query._toJson(),
+        if (using != null) 'using': using!,
+        if (filter != null) 'filter': filter!._toJson(),
+        'limit': limit,
+      };
+}
+
 /// A point and similarity score returned by a dense-vector query.
 final class ScoredPoint {
   ScoredPoint._({
@@ -726,6 +763,7 @@ final class PointOperations {
   Future<List<ScoredPoint>> query(
     String collectionName,
     VectorValue vector, {
+    Iterable<Prefetch> prefetch = const [],
     String? using,
     Filter? filter,
     int limit = 10,
@@ -734,12 +772,8 @@ final class PointOperations {
     bool withPayload = false,
     VectorSelector withVectors = const VectorSelector.none(),
   }) async {
-    if (limit <= 0) {
-      throw ArgumentError.value(limit, 'limit', 'must be positive.');
-    }
-    if (offset < 0) {
-      throw ArgumentError.value(offset, 'offset', 'must not be negative.');
-    }
+    final prefetchList = prefetch.toList(growable: false);
+    _validateQueryWindow(limit, offset);
     if (scoreThreshold != null && !scoreThreshold.isFinite) {
       throw ArgumentError.value(
         scoreThreshold,
@@ -754,6 +788,8 @@ final class PointOperations {
       method: 'POST',
       path: _pointsPath(collectionName, operations: const ['query']),
       body: {
+        if (prefetchList.isNotEmpty)
+          'prefetch': prefetchList.map((query) => query._toJson()).toList(),
         'query': vector._toJson(),
         if (using != null) 'using': using,
         if (filter != null) 'filter': filter._toJson(),
@@ -764,6 +800,48 @@ final class PointOperations {
         'with_vector': withVectors._toJson(),
       },
     );
+    return _queryPoints(response);
+  }
+
+  /// Fuses vector [prefetch] rankings using Reciprocal Rank Fusion.
+  Future<List<ScoredPoint>> queryRrf(
+    String collectionName,
+    Iterable<Prefetch> prefetch, {
+    int limit = 10,
+    int offset = 0,
+    bool withPayload = false,
+    VectorSelector withVectors = const VectorSelector.none(),
+  }) async {
+    final prefetchList = prefetch.toList(growable: false);
+    if (prefetchList.isEmpty) {
+      throw ArgumentError.value(prefetch, 'prefetch', 'must not be empty.');
+    }
+    _validateQueryWindow(limit, offset);
+    final response = await _transport.send(
+      method: 'POST',
+      path: _pointsPath(collectionName, operations: const ['query']),
+      body: {
+        'prefetch': prefetchList.map((query) => query._toJson()).toList(),
+        'query': const {'fusion': 'rrf'},
+        'limit': limit,
+        'offset': offset,
+        'with_payload': withPayload,
+        'with_vector': withVectors._toJson(),
+      },
+    );
+    return _queryPoints(response);
+  }
+
+  void _validateQueryWindow(int limit, int offset) {
+    if (limit <= 0) {
+      throw ArgumentError.value(limit, 'limit', 'must be positive.');
+    }
+    if (offset < 0) {
+      throw ArgumentError.value(offset, 'offset', 'must not be negative.');
+    }
+  }
+
+  List<ScoredPoint> _queryPoints(QdrantResponse response) {
     final result = _jsonObject(_result(response), 'result');
     final points = result['points'];
     if (points is! List) {
