@@ -204,6 +204,36 @@ void main() {
         client.points.delete('movies', []),
         throwsArgumentError,
       );
+      expect(() => PointSelector.ids([]), throwsArgumentError);
+      expect(() => PointSelector.ids([true]), throwsArgumentError);
+      await expectLater(
+        client.points.setPayload('', {}, PointSelector.ids([1])),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.overwritePayload('', {}, PointSelector.ids([1])),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.deletePayload(
+          'movies',
+          [],
+          PointSelector.ids([1]),
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.deletePayload(
+          'movies',
+          [''],
+          PointSelector.ids([1]),
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.points.clearPayload('', PointSelector.ids([1])),
+        throwsArgumentError,
+      );
       await expectLater(
         client.points.scroll('', limit: 1),
         throwsArgumentError,

@@ -180,6 +180,100 @@ void main() {
     expect(await client.collections.delete(collectionName), isTrue);
   }, tags: 'integration');
 
+  test('payload data lifecycle works against the pinned image', () async {
+    const collectionName = 'qdrant_dart_payload_data';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: CollectionVectors.dense(
+          DenseVectorParams(size: 2, distance: Distance.dot),
+        ),
+      ),
+      isTrue,
+    );
+    await client.points.upsert(collectionName, [
+      Point(
+        id: 1,
+        vector: [1, 0],
+        payload: {'group': 'red', 'keep': 'yes', 'drop': 'first'},
+      ),
+      Point(
+        id: 2,
+        vector: [0, 1],
+        payload: {'group': 'blue', 'keep': 'yes', 'drop': 'second'},
+      ),
+    ]);
+
+    final setById = await client.points.setPayload(
+      collectionName,
+      {'added': 1, 'keep': 'changed'},
+      PointSelector.ids([1]),
+    );
+    expect(setById.status, UpdateStatus.completed);
+    expect(
+      (await client.points.retrieve(collectionName, [1])).single.payload,
+      {
+        'group': 'red',
+        'keep': 'changed',
+        'drop': 'first',
+        'added': 1,
+      },
+    );
+
+    final blueFilter = Filter(
+      must: [FieldCondition.match('group', 'blue')],
+    );
+    final setByFilter = await client.points.setPayload(
+      collectionName,
+      {'filtered': true},
+      PointSelector.filter(blueFilter),
+    );
+    expect(setByFilter.status, UpdateStatus.completed);
+    expect(
+      (await client.points.retrieve(collectionName, [2]))
+          .single
+          .payload?['filtered'],
+      isTrue,
+    );
+
+    final overwrite = await client.points.overwritePayload(
+      collectionName,
+      {'only': 'replacement', 'drop': 'remove-me'},
+      PointSelector.ids([1]),
+    );
+    expect(overwrite.status, UpdateStatus.completed);
+    expect(
+      (await client.points.retrieve(collectionName, [1])).single.payload,
+      {'only': 'replacement', 'drop': 'remove-me'},
+    );
+
+    final deletion = await client.points.deletePayload(
+      collectionName,
+      ['drop'],
+      PointSelector.ids([1]),
+    );
+    expect(deletion.status, UpdateStatus.completed);
+    expect(
+      (await client.points.retrieve(collectionName, [1])).single.payload,
+      {'only': 'replacement'},
+    );
+
+    final clear = await client.points.clearPayload(
+      collectionName,
+      PointSelector.filter(blueFilter),
+    );
+    expect(clear.status, UpdateStatus.completed);
+    expect(
+      (await client.points.retrieve(collectionName, [2])).single.payload,
+      isEmpty,
+    );
+
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
+
   test('point scrolling paginates against the pinned image', () async {
     const collectionName = 'qdrant_dart_scroll';
     final client = QdrantClient(baseUrl: baseUrl);

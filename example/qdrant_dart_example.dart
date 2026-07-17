@@ -31,6 +31,11 @@ Future<void> main() async {
         payload: {'title': 'The Matrix', 'year': 1999},
       ),
     ]);
+    await client.points.setPayload(
+      collectionName,
+      {'featured': true},
+      PointSelector.ids([1]),
+    );
 
     final matches = await client.points.query(
       collectionName,
