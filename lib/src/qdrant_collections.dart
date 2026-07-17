@@ -7,6 +7,7 @@ final class CollectionInfo {
     required this.name,
     required this.status,
     required this.vectors,
+    required this.payloadIndexes,
     required this.pointsCount,
     required this.indexedVectorsCount,
     required this.segmentsCount,
@@ -20,6 +21,9 @@ final class CollectionInfo {
 
   /// The collection's dense and sparse vector configuration.
   final CollectionVectors vectors;
+
+  /// Payload indexes keyed by field name.
+  final Map<String, PayloadIndexInfo> payloadIndexes;
 
   /// The current number of points in the collection.
   final int pointsCount;
@@ -62,6 +66,17 @@ final class CollectionOperations {
       vectors: CollectionVectors._fromJson(
         params['vectors'],
         params['sparse_vectors'],
+      ),
+      payloadIndexes: Map.unmodifiable(
+        _jsonObject(
+          result['payload_schema'],
+          'result.payload_schema',
+        ).map(
+          (fieldName, value) => MapEntry(
+            fieldName,
+            PayloadIndexInfo._fromJson(value),
+          ),
+        ),
       ),
       pointsCount: _integer(result['points_count'], 'result.points_count'),
       indexedVectorsCount: _integer(

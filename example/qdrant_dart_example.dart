@@ -19,6 +19,11 @@ Future<void> main() async {
         DenseVectorParams(size: 4, distance: Distance.cosine),
       ),
     );
+    await client.payloadIndexes.create(
+      collectionName,
+      'year',
+      schema: PayloadSchemaType.integer,
+    );
     await client.points.upsert(collectionName, [
       Point(
         id: 1,

@@ -289,6 +289,77 @@ void main() {
     expect(await client.collections.delete(collectionName), isTrue);
   }, tags: 'integration');
 
+  test('payload index lifecycle works against the pinned image', () async {
+    const collectionName = 'qdrant_dart_payload_indexes';
+    final client = QdrantClient(baseUrl: baseUrl);
+    addTearDown(() => client.close(force: true));
+
+    expect(
+      await client.collections.create(
+        collectionName,
+        vectors: CollectionVectors.dense(
+          DenseVectorParams(size: 2, distance: Distance.dot),
+        ),
+      ),
+      isTrue,
+    );
+
+    const schemas = {
+      'city': PayloadSchemaType.keyword,
+      'year': PayloadSchemaType.integer,
+      'rating': PayloadSchemaType.floatingPoint,
+      'location': PayloadSchemaType.geo,
+      'description': PayloadSchemaType.text,
+      'active': PayloadSchemaType.boolean,
+      'published_at': PayloadSchemaType.dateTime,
+      'external_id': PayloadSchemaType.uuid,
+    };
+    for (final MapEntry(:key, :value) in schemas.entries) {
+      final update = await client.payloadIndexes.create(
+        collectionName,
+        key,
+        schema: value,
+      );
+      expect(update.status, UpdateStatus.completed);
+    }
+
+    final indexed = await client.collections.get(collectionName);
+    expect(indexed.payloadIndexes.keys, containsAll(schemas.keys));
+    for (final MapEntry(:key, :value) in schemas.entries) {
+      expect(indexed.payloadIndexes[key]?.schema, value);
+    }
+
+    await client.points.upsert(collectionName, [
+      Point(
+        id: 1,
+        vector: [1, 0],
+        payload: {'city': 'London', 'year': 1999},
+      ),
+    ]);
+    final matches = await client.points.query(
+      collectionName,
+      DenseVector([1, 0]),
+      filter: Filter(
+        must: [
+          FieldCondition.match('city', 'London'),
+          FieldCondition.range('year', gte: 1990),
+        ],
+      ),
+    );
+    expect(matches.single.id, 1);
+
+    final deletion = await client.payloadIndexes.delete(
+      collectionName,
+      'city',
+    );
+    expect(deletion.status, UpdateStatus.completed);
+    final afterDeletion = await client.collections.get(collectionName);
+    expect(afterDeletion.payloadIndexes, isNot(contains('city')));
+    expect(afterDeletion.payloadIndexes, contains('year'));
+
+    expect(await client.collections.delete(collectionName), isTrue);
+  }, tags: 'integration');
+
   test('point query applies payload filters against the pinned image',
       () async {
     const collectionName = 'qdrant_dart_query';

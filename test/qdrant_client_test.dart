@@ -138,6 +138,36 @@ void main() {
     });
   });
 
+  group('PayloadIndexOperations', () {
+    test('rejects empty collection and field names', () async {
+      final client = QdrantClient(
+        baseUrl: Uri.parse('http://127.0.0.1:6333'),
+      );
+      addTearDown(client.close);
+
+      await expectLater(
+        client.payloadIndexes.create(
+          '',
+          'year',
+          schema: PayloadSchemaType.integer,
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.payloadIndexes.create(
+          'movies',
+          '',
+          schema: PayloadSchemaType.integer,
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        client.payloadIndexes.delete('movies', ''),
+        throwsArgumentError,
+      );
+    });
+  });
+
   group('PointOperations', () {
     test('rejects invalid point operation inputs', () async {
       final client = QdrantClient(

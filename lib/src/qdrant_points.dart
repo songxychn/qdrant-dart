@@ -543,20 +543,21 @@ final class PointOperations {
     return idList;
   }
 
-  UpdateResult _updateResult(QdrantResponse response) {
-    final result = _jsonObject(_result(response), 'result');
-    final operationId = result['operation_id'];
-    if (operationId != null && operationId is! int) {
-      throw FormatException(
-        'Qdrant response has no integer operation ID.',
-      );
-    }
-    return UpdateResult(
-      operationId: operationId as int?,
-      status: UpdateStatus._fromJson(result['status']),
-    );
-  }
-
   Object? _result(QdrantResponse response) =>
       _jsonObject(jsonDecode(response.body), 'response')['result'];
+}
+
+UpdateResult _updateResult(QdrantResponse response) {
+  final result = _jsonObject(
+    _jsonObject(jsonDecode(response.body), 'response')['result'],
+    'result',
+  );
+  final operationId = result['operation_id'];
+  if (operationId != null && operationId is! int) {
+    throw FormatException('Qdrant response has no integer operation ID.');
+  }
+  return UpdateResult(
+    operationId: operationId as int?,
+    status: UpdateStatus._fromJson(result['status']),
+  );
 }
