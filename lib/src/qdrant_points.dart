@@ -139,7 +139,7 @@ final class ScrollPage {
 }
 
 /// A condition accepted in Qdrant filter clauses.
-sealed class FilterCondition {
+abstract final class FilterCondition {
   const FilterCondition();
 
   Map<String, Object> _toJson();

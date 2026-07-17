@@ -165,7 +165,7 @@ final class CollectionVectors {
 }
 
 /// A dense or sparse vector value.
-sealed class VectorValue {
+abstract final class VectorValue {
   const VectorValue();
 
   Object _toJson();

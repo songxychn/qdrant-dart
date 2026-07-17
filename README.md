@@ -45,7 +45,9 @@ Development is verified against a minimum supported Qdrant `v1.12.0` and the
 current target `v1.18.2`. [`tool/qdrant-min-version`](tool/qdrant-min-version)
 and [`tool/qdrant-version`](tool/qdrant-version) are the sources of truth used
 by the compatibility harness. Collection point and indexed-vector counts are
-nullable because supported Qdrant versions may omit those statistics.
+nullable because supported Qdrant versions may omit those statistics. Vector
+values and filter conditions are SDK-owned hierarchies; callers should not
+assume the currently exported subtypes are exhaustive.
 
 The SDK supports HTTP/HTTPS client configuration, API-key authentication,
 request timeouts, typed failure reporting, and collection lifecycle operations
